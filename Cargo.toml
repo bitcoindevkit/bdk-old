@@ -1,0 +1,39 @@
+[package]
+name = "btcdk"
+version = "0.1.0"
+authors = ["Steve Myers <steve@notmandatory.org>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+jni = { version = "0.13.1", default-features = false }
+bitcoin-wallet="1.0"
+bitcoin={version= "0.21", features=["serde"]}
+bitcoin_hashes={version="0.7", features=["serde"]}
+byteorder = "1"
+clap = "2.33"
+dirs="2.0.2"
+#futures = { version = "0.3", features=["thread-pool"]}
+futures-preview = "=0.3.0-alpha.18"
+futures-timer = "0.3"
+hex="0.3"
+log="0.4"
+lru-cache = "0.1.2"
+murmel="0.2.1"
+rand = "0.7"
+rand_distr = "0.2"
+rusqlite={version="0.20", features=["bundled"]}
+serde = "1"
+serde_derive = "1"
+serde_cbor = "0.10"
+simplelog="0.6"
+siphasher="0.3"
+toml="0.5"
+
+[profile.release]
+lto = true
+
+[lib]
+name = "btcdk"
+crate-type = ["cdylib"]
