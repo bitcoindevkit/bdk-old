@@ -40,64 +40,54 @@ use jni::sys::{jboolean, jint, jobject, jobjectArray};
 use murmel::chaindb::ChainDB;
 
 use crate::config::Config;
-use crate::{config, wallet, db};
+use crate::{config, wallet, db, init_config, InitResult, load_config, remove_config, update_config};
 use crate::wallet::KEY_LOOK_AHEAD;
+use crate::db::DB;
 
 // Optional<Config> org.btcdk.jni.BtcDkLib.loadConfig(String workDir, int network)
 #[no_mangle]
 pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_loadConfig(env: JNIEnv, _: JObject,
-                                                                    j_workdir: JString,
-                                                                    j_network: jint) -> jobject {
-    let workdir = string_from_jstring(&env, j_workdir);
+                                                            j_work_dir: JString,
+                                                            j_network: jint) -> jobject {
+
+    let work_dir = string_from_jstring(&env, j_work_dir);
+    let work_dir = PathBuf::from(work_dir);
     let network = network_from_jint(j_network);
 
-    let mut file_path = PathBuf::from(workdir);
-    file_path.push(network.to_string());
-    file_path.push("btcdk.cfg");
-
-    if let Ok(config) = config::load(&file_path) {
-        j_optional_config(&env, &config)
-    } else {
-        j_optional_empty(&env)
+    match load_config(work_dir, network) {
+        Ok(config) => j_optional_config(&env, &config),
+        Err(_err)  => j_optional_empty(&env)
     }
 }
 
 // Optional<Config> org.btcdk.jni.BtcDkLib.removeConfig(String workDir, int network)
 #[no_mangle]
 pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_removeConfig(env: JNIEnv, _: JObject,
-                                                                      j_workdir: JString,
-                                                                      j_network: jint) -> jobject {
-    let workdir = string_from_jstring(&env, j_workdir);
+                                                              j_work_dir: JString,
+                                                              j_network: jint) -> jobject {
+
+    let work_dir = string_from_jstring(&env, j_work_dir);
+    let work_dir = PathBuf::from(work_dir);
     let network = network_from_jint(j_network);
 
-    let mut config_path = PathBuf::from(workdir);
-    config_path.push(network.to_string());
-    let mut file_path = config_path.clone();
-    file_path.push("btcdk.cfg");
-
-    if let Ok(config) = config::load(&file_path) {
-        config::remove(&config_path).expect("error deleting config");
-        j_optional_config(&env, &config)
-    } else {
-        j_optional_empty(&env)
+    match remove_config(work_dir, network) {
+        Ok(config) => j_optional_config(&env, &config),
+        Err(_err)  => j_optional_empty(&env)
     }
 }
 
 // Optional<Config> org.btcdk.jni.BtcDkLib.updateConfig(String workDir, int network, String[] bitcoinPeers, int bitcoinConnections, boolean bitcoinDiscovery)
 #[no_mangle]
 pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_updateConfig(env: JNIEnv, _: JObject,
-                                                                      j_workdir: JString,
-                                                                      j_network: jint,
-                                                                      j_bitcoin_peers: jobjectArray,
-                                                                      j_bitcoin_connections: jint,
-                                                                      j_bitcoin_discovery: jboolean) -> jobject {
-    let workdir = string_from_jstring(&env, j_workdir);
-    let network = network_from_jint(j_network);
+                                                              j_work_dir: JString,
+                                                              j_network: jint,
+                                                              j_bitcoin_peers: jobjectArray,
+                                                              j_bitcoin_connections: jint,
+                                                              j_bitcoin_discovery: jboolean) -> jobject {
 
-    let mut config_path = PathBuf::from(workdir);
-    config_path.push(network.to_string());
-    let mut file_path = config_path.clone();
-    file_path.push("btcdk.cfg");
+    let work_dir = string_from_jstring(&env, j_work_dir);
+    let work_dir = PathBuf::from(work_dir);
+    let network = network_from_jint(j_network);
 
     let bitcoin_peers_length = env.get_array_length(j_bitcoin_peers)
         .expect("error get_array_length j_bitcoin_peers");
@@ -118,163 +108,141 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_updateConfig(env: JNIEnv, _: JO
             .expect("error SocketAddr::from_str(bitcoin_peer)");
 
         let index = usize::try_from(i).expect("usize::try_from(bitcoin_peers_length");
-        bitcoin_peers[index] = bitcoin_peer_addr;
+        bitcoin_peers.push(bitcoin_peer_addr);
     }
 
     let bitcoin_connections = usize::try_from(j_bitcoin_connections).expect("usize::try_from(j_bitcoin_connections");
     let bitcoin_discovery = j_bitcoin_discovery == 1;
 
-    if let Ok(config) = config::load(&file_path) {
-        let updated_config = config.update(bitcoin_peers, bitcoin_connections, bitcoin_discovery);
-        config::save(&config_path, &file_path, &updated_config).expect("error saving updated_config");
-        j_optional_config(&env, &updated_config)
-    } else {
-        j_optional_empty(&env)
+    match update_config(work_dir, network, bitcoin_peers, bitcoin_connections, bitcoin_discovery) {
+        Ok(updated_config) => j_optional_config(&env, &updated_config),
+        Err(_err)  => j_optional_empty(&env)
     }
 }
 
 // Optional<InitResult> org.btcdk.jni.BtcDkLib.initConfig(String workDir, int network, String passphrase, String pdPassphrase)
 #[no_mangle]
 pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_initConfig(env: JNIEnv, _: JObject,
-                                                                    j_workdir: JString,
-                                                                    j_network: jint,
-                                                                    j_passphrase: JString,
-                                                                    j_pd_passphrase: JString) -> jobject {
-    let workdir = string_from_jstring(&env, j_workdir);
+                                                            j_work_dir: JString,
+                                                            j_network: jint,
+                                                            j_passphrase: JString,
+                                                            j_pd_passphrase: JString) -> jobject {
+
+    let work_dir = string_from_jstring(&env, j_work_dir);
+    let work_dir = PathBuf::from(work_dir);
     let network = network_from_jint(j_network);
 
-    let mut config_path = PathBuf::from(workdir);
-    config_path.push(network.to_string());
-    fs::create_dir_all(&config_path).expect(format!("unable to create config_path: {}", &config_path.to_str().unwrap()).as_str());
-
-    let mut file_path = config_path.clone();
-    file_path.push("btcdk.cfg");
-
     let passphrase = string_from_jstring(&env, j_passphrase);
+    let passphrase = passphrase.as_str();
     let pd_passphrase = env.get_string(j_pd_passphrase).ok();
     let pd_passphrase = pd_passphrase.iter()
         .map(|pd| pd.to_str().expect("error j_pd_passphrase JavaStr.to_str()"))
         .next();
 
-    if let Ok(_config) = config::load(&file_path) {
-        // do not init if a config already exists, return empty
-        j_optional_empty(&env)
-    } else {
-
-        // create new wallet
-        let (mnemonic_words, deposit_address, wallet) = Wallet::new(network, passphrase.as_str(), pd_passphrase);
-        let mnemonic_words = mnemonic_words.to_string();
-        let deposit_address = deposit_address.to_string();
-
-        let encryptedwalletkey = hex::encode(wallet.encrypted().as_slice());
-        let keyroot = wallet.master_public().to_string();
-        let lookahead = KEY_LOOK_AHEAD;
-        let birth = wallet.birth();
-
-        // init database
-        db::init(&config_path, &wallet.coins, &wallet.master);
-
-        // save config
-        let config = Config::new(encryptedwalletkey.as_str(),
-                                 keyroot.as_str(), lookahead, birth, network);
-        config::save(&config_path, &file_path, &config).expect("error saving config");
-
-        // return config
-        j_optional_init_result(&env, mnemonic_words.as_str(), deposit_address.as_str())
+    match init_config(work_dir, network, passphrase, pd_passphrase) {
+        Ok(None) => {
+            // do not init if a config already exists, return empty
+            j_optional_empty(&env)
+        },
+        Ok(Some(init_result)) => {
+            // return config
+            j_optional_init_result(&env, init_result)
+        }
+       Err(_err) => {
+           // TODO throw java exception
+           j_optional_empty(&env)
+       }
     }
 }
 
 // void org.btcdk.jni.BtcDkLib.start(String workDir, int network, boolean rescan)
-// #[no_mangle]
-// pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_start(env: JNIEnv, _: JObject, j_workdir: JString, j_network: jint, j_rescan: jboolean) {
-//     let workdir = string_from_jstring(&env, j_workdir);
-//     let network = network_from_jint(j_network);
-//     let rescan = j_rescan == 1;
-//
-//     let mut config_path = PathBuf::from(workdir);
-//     config_path.push(network.to_string());
-//
-//     let mut config_file_path = config_path.clone();
-//     config_file_path.push("btcdk.cfg");
-//
-//     let config = config::load(&config_file_path).expect("can not open config file");
-//
-//     let mut chain_file_path = config_path.clone();
-//     chain_file_path.push("btcdk.chain");
-//
-//     let mut chain_db = ChainDB::new(chain_file_path.as_path(), network).expect("can not open chain db");
-//     chain_db.init().expect("can not initialize db");
-//     let chain_db = Arc::new(RwLock::new(chain_db));
-//
-//     let db = open_db(&config_path);
-//     let db = Arc::new(Mutex::new(db));
-//
-//     // get master account
-//     let mut bitcoin_wallet;
-//     let mut master_account = MasterAccount::from_encrypted(
-//         hex::decode(config.encryptedwalletkey).expect("encryptedwalletkey is not hex").as_slice(),
-//         ExtendedPubKey::from_str(config.keyroot.as_str()).expect("keyroot is malformed"),
-//         config.birth,
-//     );
-//
-//     // load wallet from master account
-//     {
-//         let mut db = db.lock().unwrap();
-//         let mut tx = db.transaction();
-//         let account = tx.read_account(0, 0, network, config.lookahead).expect("can not read account 0/0");
-//         master_account.add_account(account);
-//         let account = tx.read_account(0, 1, network, config.lookahead).expect("can not read account 0/1");
-//         master_account.add_account(account);
-//         let account = tx.read_account(1, 0, network, 0).expect("can not read account 1/0");
-//         master_account.add_account(account);
-//         let coins = tx.read_coins(&mut master_account).expect("can not read coins");
-//         bitcoin_wallet = Wallet::from_storage(coins, master_account);
-//     }
-//
-//     // rescan chain if requested
-//     if rescan {
-//         let chain_db = chain_db.read().unwrap();
-//         let mut after = None;
-//         for cached_header in chain_db.iter_trunk_rev(None) {
-//             if (cached_header.stored.header.time as u64) < config.birth {
-//                 after = Some(cached_header.bitcoin_hash());
-//                 break;
-//             }
-//         }
-//         if let Some(after) = after {
-//             info!("Re-scanning after block {}", &after);
-//             let mut db = db.lock().unwrap();
-//             let mut tx = db.transaction();
-//             tx.rescan(&after).expect("can not re-scan");
-//             tx.commit();
-//             bitcoin_wallet.rescan();
-//         }
-//     }
-//
-//     let trunk = Arc::new(ChainDBTrunk { chaindb: chain_db.clone() });
-//     info!("Wallet balance: {} satoshis {} available", bitcoin_wallet.balance(), bitcoin_wallet.available_balance(trunk.len(), |h| trunk.get_height(h)));
-//
-//     let content_store =
-//         Arc::new(RwLock::new(
-//             ContentStore::new(db.clone(), 0,
-//                               trunk,
-//                               bitcoin_wallet)
-//                 .expect("can not initialize content store")));
-//
-//     // if let Some(http) = http_rpc {
-//     //     let address = http.clone();
-//     //     let store = content_store.clone();
-//     //     let apikey = config.apikey.clone();
-//     //     thread::Builder::new().name("http".to_string()).spawn(
-//     //         move || start_api(&address, store, apikey)).expect("can not start http api");
-//     // }
-//
-//     let mut thread_pool = ThreadPoolBuilder::new().name_prefix("futures ").create().expect("can not start thread pool");
-//     P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
-//                     content_store.clone(), config.birth).start(&mut thread_pool);
-//
-//     thread_pool.run(future::pending::<()>());
-// }
+#[no_mangle]
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_start(env: JNIEnv, _: JObject, j_workdir: JString, j_network: jint, j_rescan: jboolean) {
+    let workdir = string_from_jstring(&env, j_workdir);
+    let network = network_from_jint(j_network);
+    let rescan = j_rescan == 1;
+
+    let mut config_path = PathBuf::from(workdir);
+    config_path.push(network.to_string());
+
+    let mut config_file_path = config_path.clone();
+    config_file_path.push("btcdk.cfg");
+
+    let config = config::load(&config_file_path).expect("can not open config file");
+
+    let mut chain_file_path = config_path.clone();
+    chain_file_path.push("btcdk.chain");
+
+    let mut chain_db = ChainDB::new(chain_file_path.as_path(), network).expect("can not open chain db");
+    chain_db.init().expect("can not initialize db");
+    let chain_db = Arc::new(RwLock::new(chain_db));
+
+    let db = open_db(&config_path);
+    let db = Arc::new(Mutex::new(db));
+
+    // get master account
+    let mut bitcoin_wallet;
+    let mut master_account = MasterAccount::from_encrypted(
+        hex::decode(config.encryptedwalletkey).expect("encryptedwalletkey is not hex").as_slice(),
+        ExtendedPubKey::from_str(config.keyroot.as_str()).expect("keyroot is malformed"),
+        config.birth,
+    );
+
+    // load wallet from master account
+    {
+        let mut db = db.lock().unwrap();
+        let mut tx = db.transaction();
+        let account = tx.read_account(0, 0, network, config.lookahead).expect("can not read account 0/0");
+        master_account.add_account(account);
+        let account = tx.read_account(0, 1, network, config.lookahead).expect("can not read account 0/1");
+        master_account.add_account(account);
+        let account = tx.read_account(1, 0, network, 0).expect("can not read account 1/0");
+        master_account.add_account(account);
+        let coins = tx.read_coins(&mut master_account).expect("can not read coins");
+        bitcoin_wallet = Wallet::from_storage(coins, master_account);
+    }
+
+    // rescan chain if requested
+    if rescan {
+        let chain_db = chain_db.read().unwrap();
+        let mut after = None;
+        for cached_header in chain_db.iter_trunk_rev(None) {
+            if (cached_header.stored.header.time as u64) < config.birth {
+                after = Some(cached_header.bitcoin_hash());
+                break;
+            }
+        }
+        if let Some(after) = after {
+            info!("Re-scanning after block {}", &after);
+            let mut db = db.lock().unwrap();
+            let mut tx = db.transaction();
+            tx.rescan(&after).expect("can not re-scan");
+            tx.commit();
+            bitcoin_wallet.rescan();
+        }
+    }
+
+    let trunk = Arc::new(ChainDBTrunk { chaindb: chain_db.clone() });
+    info!("Wallet balance: {} satoshis {} available", bitcoin_wallet.balance(), bitcoin_wallet.available_balance(trunk.len(), |h| trunk.get_height(h)));
+
+    let content_store =
+        Arc::new(RwLock::new(
+            ContentStore::new(db.clone(), trunk, bitcoin_wallet).expect("can not initialize content store")));
+
+    // if let Some(http) = http_rpc {
+    //     let address = http.clone();
+    //     let store = content_store.clone();
+    //     let apikey = config.apikey.clone();
+    //     thread::Builder::new().name("http".to_string()).spawn(
+    //         move || start_api(&address, store, apikey)).expect("can not start http api");
+    // }
+
+    let mut thread_pool = ThreadPoolBuilder::new().name_prefix("futures ").create().expect("can not start thread pool");
+    P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
+                    content_store.clone(), config.birth).start(&mut thread_pool);
+
+    thread_pool.run(future::pending::<()>());
+}
 
 // private functions
 
@@ -314,10 +282,10 @@ fn jint_from_network(network: Network) -> jint {
 }
 
 // InitResult(String mnemonicWords, String depositAddress)
-fn j_optional_init_result(env: &JNIEnv, mnemonic_words: &str, deposit_address: &str) -> jobject {
-    let mnemonic_words = env.new_string(mnemonic_words)
+fn j_optional_init_result(env: &JNIEnv, init_result: InitResult) -> jobject {
+    let mnemonic_words = env.new_string(init_result.mnemonic_words)
         .expect("error new_string mnemonic_words");
-    let deposit_address = env.new_string(deposit_address)
+    let deposit_address = env.new_string(init_result.deposit_address)
         .expect("error new_string deposit_address");
 
     // org.btcdk.jni.InitResult
@@ -384,15 +352,9 @@ fn j_optional_config(env: &JNIEnv, config: &Config) -> jobject {
     j_result.into_inner()
 }
 
-// fn open_db(config_path: &Path) -> DB {
-//     let mut db_path = PathBuf::from(config_path);
-//     db_path.push("btcdk.db");
-//     let db = DB::new(db_path.as_path()).expect(format!("Can't open DB {}", db_path.to_str().expect("can't get db_path")).as_str());
-//     db
-// }
-
-#[cfg(test)]
-mod test {
-
-
+fn open_db(config_path: &Path) -> DB {
+    let mut db_path = PathBuf::from(config_path);
+    db_path.push("btcdk.db");
+    let db = DB::new(db_path.as_path()).expect(format!("Can't open DB {}", db_path.to_str().expect("can't get db_path")).as_str());
+    db
 }

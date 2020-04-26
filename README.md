@@ -37,7 +37,7 @@ bitcoin network.
     Android:
     ```
     export ANDROID_HOME=$HOME/Library/Android
-    export NDK_HOME=$ANDROID_HOME/sdk/ndk/<ndk version, eg. 21.0.6113669>
+    export ANDROID_NDK_HOME=$ANDROID_HOME/sdk/ndk/<ndk version, eg. 21.0.6113669>
     ```
 
     iOS:

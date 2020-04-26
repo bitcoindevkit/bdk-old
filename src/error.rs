@@ -33,7 +33,9 @@ pub enum Error {
     /// DB error
     DB(rusqlite::Error),
     /// script validation error
-    Script(script::Error)
+    Script(script::Error),
+    /// TOML decode error
+    Toml_De(toml::de::Error),
 }
 
 impl std::error::Error for Error {
@@ -43,7 +45,8 @@ impl std::error::Error for Error {
             Error::Wallet(ref err) => err.description(),
             Error::IO(ref err) => err.description(),
             Error::DB(ref err) => err.description(),
-            Error::Script(ref err) => err.description()
+            Error::Script(ref err) => err.description(),
+            Error::Toml_De(ref err) => err.description()
         }
     }
 
@@ -53,7 +56,8 @@ impl std::error::Error for Error {
             Error::Wallet(ref err) => Some(err),
             Error::IO(ref err) => Some(err),
             Error::DB(ref err) => Some(err),
-            Error::Script(ref err) => Some(err)
+            Error::Script(ref err) => Some(err),
+            Error::Toml_De(ref err) => Some(err)
         }
     }
 }
@@ -61,13 +65,13 @@ impl std::error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            // Both underlying errors already impl `Display`, so we defer to
-            // their implementations.
+            // underlying errors already impl `Display`, so we defer to their implementations.
             Error::Unsupported(ref s) => write!(f, "Unsupported: {}", s),
             Error::Wallet(ref s) => write!(f, "{}", s),
             Error::IO(ref s) => write!(f, "{}", s),
-            Error::DB(ref s) =>  write!(f, "{}", s),
-            Error::Script(ref s) =>  write!(f, "{}", s),
+            Error::DB(ref s) => write!(f, "{}", s),
+            Error::Script(ref s) => write!(f, "{}", s),
+            Error::Toml_De(ref s) => write!(f, "{}", s)
         }
     }
 }
@@ -123,5 +127,11 @@ impl convert::From<bitcoin_hashes::hex::Error> for Error {
 impl convert::From<script::Error> for Error {
     fn from(err: script::Error) -> Error {
         Error::Script(err)
+    }
+}
+
+impl convert::From<toml::de::Error> for Error {
+    fn from(err: toml::de::Error) -> Error {
+        Error::Toml_De(err)
     }
 }

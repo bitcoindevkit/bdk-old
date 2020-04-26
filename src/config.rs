@@ -20,6 +20,8 @@ use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::net::SocketAddr;
 use std::path::Path;
+use crate::error::Error;
+use crate::error::Error::Toml_De;
 
 use bitcoin::Network;
 
@@ -63,7 +65,7 @@ impl Config {
     }
 }
 
-pub fn save(config_path: &Path, file_path: &Path, config: &Config) -> io::Result<()> {
+pub fn save(config_path: &Path, file_path: &Path, config: &Config) -> Result<(), Error> {
     fs::create_dir_all(&config_path)?;
     let mut file = File::create(file_path)?;
     let config_string = toml::to_string(config).unwrap();
@@ -73,19 +75,22 @@ pub fn save(config_path: &Path, file_path: &Path, config: &Config) -> io::Result
     Ok(())
 }
 
-pub fn load(file_path: &Path) -> io::Result<Config> {
+pub fn load(file_path: &Path) -> Result<Config, Error> {
     // get config (if any)
     let mut file = File::open(file_path)?;
     let mut config_string = String::new();
     file.read_to_string(&mut config_string)?;
     match toml::from_str(config_string.as_str()) {
         Ok(c) => Ok(c),
-        Err(e) => Err(io::Error::new(ErrorKind::InvalidData, e.to_string()))
+        Err(e) => Err(e.into())
     }
 }
 
-pub fn remove(config_path: &Path) -> io::Result<()> {
-    fs::remove_dir_all(config_path)
+pub fn remove(config_path: &Path) -> Result<(), Error> {
+     match fs::remove_dir_all(config_path) {
+         Ok(()) => Ok(()),
+         Err(e) => Err(e.into())
+     }
 }
 
 #[cfg(test)]
