@@ -22,7 +22,7 @@ use bitcoin::{Network, Address};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use log::{info, warn, error};
-use btcdk::api::{init_config, update_config, start, balance, deposit_addr, withdraw};
+use btcdk::api::{init_config, update_config, start, balance, deposit_addr, withdraw, stop};
 use std::thread;
 use btcdk::api;
 use bitcoin_hashes::core::time::Duration;
@@ -71,6 +71,8 @@ fn main() {
             Ok(wtx) => info!("withdraw tx: {:?}", wtx),
             Err(e) => error!("withdraw error: {:?}", e),
         }
+
+        stop();
     });
 
     info!("Before start.");

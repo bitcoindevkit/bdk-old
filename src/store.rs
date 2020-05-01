@@ -50,6 +50,7 @@ pub struct ContentStore {
     db: SharedDB,
     wallet: Wallet,
     txout: Option<PeerMessageSender<NetworkMessage>>,
+    stopped: bool
 }
 
 impl ContentStore {
@@ -61,7 +62,16 @@ impl ContentStore {
             db,
             wallet,
             txout: None,
+            stopped: false
         })
+    }
+
+    pub fn set_stopped(&mut self, stopped: bool) {
+        self.stopped = stopped;
+    }
+
+    pub fn get_stopped(& self) -> bool {
+        self.stopped
     }
 
     pub fn set_tx_sender(&mut self, txout: PeerMessageSender<NetworkMessage>) {

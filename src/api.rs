@@ -222,11 +222,19 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
     P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
                     content_store.clone(), config.birth).start(&mut thread_pool);
 
-    thread_pool.run(future::pending::<()>());
-    //let store = content_store.clone();
-    // thread_pool.run(start_api(store));
-    // EVT_CHANNEL.0.send(Event::Stopped).unwrap();
+    let store = content_store.clone();
+    thread_pool.run(check_stopped(store));
     Ok(())
+}
+
+async fn check_stopped(store: Arc<RwLock<ContentStore>>) -> () {
+    info!("start check_stopped");
+    let mut stopped = false;
+    while !stopped {
+        Delay::new(time::Duration::from_millis(100)).await;
+        stopped = store.read().unwrap().get_stopped();
+    }
+    warn!("stopped");
 }
 
 #[derive(Debug, Clone)]
@@ -236,6 +244,11 @@ impl BalanceAmt {
     fn new(balance: u64, confirmed: u64) -> BalanceAmt {
         BalanceAmt { balance, confirmed }
     }
+}
+
+pub fn stop() -> () {
+    let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
+    store.write().unwrap().set_stopped(true);
 }
 
 pub fn balance() -> BalanceAmt {
