@@ -21,11 +21,11 @@ use std::path::PathBuf;
 use bitcoin::{Network, Address};
 use std::net::SocketAddr;
 use std::str::FromStr;
-use log::{info, warn};
-use btcdk::api::{init_config, update_config, start, send_cmd, Event, Command};
+use log::{info, warn, error};
+use btcdk::api::{init_config, update_config, start, balance, deposit_addr, withdraw};
 use std::thread;
 use btcdk::api;
-use btcdk::api::Command::GetBalance;
+use bitcoin_hashes::core::time::Duration;
 
 const PASSPHRASE: &str = "correct horse battery staple";
 const PD_PASSPHRASE_1: &str = "test123";
@@ -45,48 +45,35 @@ fn main() {
                                 vec!(peer1, peer2),
                                 2, false).unwrap();
 
-    // user output thread
     thread::spawn(move || {
-        loop {
-            match api::recv_evt() {
-                Ok(evt) => {
-                    info!("received evt: {:?}", evt);
-                    match evt {
-                        Event::Stopped => {
-                            warn!("stopped.");
-                            break;
-                        },
-                        Event::Balance { balance, confirmed } => {
-                            info!("balance: {}, confirmed: {}", balance, confirmed);
-                        },
-                        Event::DepositAddress { address } => {
-                            info!("deposit address: {}", address);
-                        },
-                        Event::WithdrawTx { txid } => {
-                            info!("withdraw txid: {}", txid);
-                        }
-                        _ => { // do nothing }
-                        }
-                    }
-                }
-                Err(err) => {
-                    warn!("receive error: {}", err);
-                }
-            }
+        thread::sleep(Duration::from_millis(1000));
+        let balanceAmt = balance();
+        info!("balance: {:?}", balanceAmt);
+
+        let deposit_addr = deposit_addr();
+        info!("deposit addr: {:?}", deposit_addr);
+
+        let withdrawTx = withdraw(PASSPHRASE.to_string(),
+                                Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
+                                10000, None);
+        match withdrawTx {
+            Ok(wtx) => info!("withdraw tx: {:?}", wtx),
+            Err(e) => error!("withdraw error: {:?}", e),
+        }
+
+        let balanceAmt = balance();
+        info!("balance: {:?}", balanceAmt);
+
+        let withdrawTx = withdraw(PASSPHRASE.to_string(),
+                                Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
+                                1, Some(1000000));
+        match withdrawTx {
+            Ok(wtx) => info!("withdraw tx: {:?}", wtx),
+            Err(e) => error!("withdraw error: {:?}", e),
         }
     });
 
     info!("Before start.");
-
-    send_cmd(Command::GetBalance);
-    send_cmd(Command::GetDepositAddress);
-    send_cmd(Command::Withdraw {
-        passphrase: PASSPHRASE.to_string(),
-        target_address: Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
-        fee_per_byte: 10000,
-        amount: Some(1000000)
-    });
-    //send_cmd(Command::Stop);
 
     start(work_dir.clone(), Network::Regtest, false);
 }

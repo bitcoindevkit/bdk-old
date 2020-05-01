@@ -21,7 +21,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::net::SocketAddr;
 use std::path::Path;
 use crate::error::Error;
-use crate::error::Error::Toml_De;
+use crate::error::Error::TomlDe;
 
 use bitcoin::Network;
 

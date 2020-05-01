@@ -35,9 +35,7 @@ pub enum Error {
     /// script validation error
     Script(script::Error),
     /// TOML decode error
-    Toml_De(toml::de::Error),
-    /// crossbeam channel error
-    Channel_Recv(crossbeam::channel::RecvError)
+    TomlDe(toml::de::Error),
 }
 
 impl std::error::Error for Error {
@@ -48,8 +46,7 @@ impl std::error::Error for Error {
             Error::IO(ref err) => err.description(),
             Error::DB(ref err) => err.description(),
             Error::Script(ref err) => err.description(),
-            Error::Toml_De(ref err) => err.description(),
-            Error::Channel_Recv(ref err) => err.description(),
+            Error::TomlDe(ref err) => err.description(),
         }
     }
 
@@ -60,8 +57,7 @@ impl std::error::Error for Error {
             Error::IO(ref err) => Some(err),
             Error::DB(ref err) => Some(err),
             Error::Script(ref err) => Some(err),
-            Error::Toml_De(ref err) => Some(err),
-            Error::Channel_Recv(ref err) => Some(err),
+            Error::TomlDe(ref err) => Some(err),
         }
     }
 }
@@ -75,8 +71,7 @@ impl fmt::Display for Error {
             Error::IO(ref s) => write!(f, "{}", s),
             Error::DB(ref s) => write!(f, "{}", s),
             Error::Script(ref s) => write!(f, "{}", s),
-            Error::Toml_De(ref s) => write!(f, "{}", s),
-            Error::Channel_Recv(ref s) => write!(f, "{}", s),
+            Error::TomlDe(ref s) => write!(f, "{}", s),
         }
     }
 }
@@ -137,12 +132,6 @@ impl convert::From<script::Error> for Error {
 
 impl convert::From<toml::de::Error> for Error {
     fn from(err: toml::de::Error) -> Error {
-        Error::Toml_De(err)
-    }
-}
-
-impl convert::From<crossbeam::channel::RecvError> for Error {
-    fn from(err: crossbeam::channel::RecvError) -> Error {
-        Error::Channel_Recv(err)
+        Error::TomlDe(err)
     }
 }

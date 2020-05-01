@@ -31,42 +31,20 @@ use crate::config::Config;
 use crate::error::Error;
 use crate::wallet::{KEY_LOOK_AHEAD, Wallet};
 use crate::p2p_bitcoin::{ChainDBTrunk, P2PBitcoin};
-use crate::store::ContentStore;
+use crate::store::{ContentStore, SharedContentStore};
 use crate::db::DB;
 use crate::trunk::Trunk;
-use crate::{config, db};
+use crate::{config, db, store};
 use once_cell::sync::Lazy;
-use crossbeam::channel::{Sender, Receiver, unbounded};
 use log::{info, warn};
 use futures_timer::Delay;
 use std::thread::spawn;
 use std::time::Duration;
-use crossbeam::channel::RecvError;
-use crate::error::Error::Channel_Recv;
 use bitcoin_hashes::sha256d;
 
 const CONFIG_FILE_NAME: &str = "btcdk.cfg";
 
-static CMD_CHANNEL: Lazy<(Sender<Command>, Receiver<Command>)> = Lazy::new(unbounded);
-static EVT_CHANNEL: Lazy<(Sender<Event>, Receiver<Event>)> = Lazy::new(unbounded);
-
-#[derive(Debug, Clone)]
-pub enum Command {
-    Stop,
-    GetBalance,
-    GetDepositAddress,
-    // if amount is not specified it withdraws all. Amount is in satoshis, fee is in satoshi/vByte
-    Withdraw { passphrase: String, target_address: Address, fee_per_byte: u64, amount: Option<u64> },
-}
-
-#[derive(Debug, Clone)]
-pub enum Event {
-    Stopped,
-    Balance { balance: u64, confirmed: u64 },
-    DepositAddress { address: String },
-    WithdrawTx { txid: sha256d::Hash },
-    Error { message: String }
-}
+static CONTENT_STORE: Lazy<Arc<RwLock<Option<SharedContentStore>>>> = Lazy::new(|| Arc::new(RwLock::new(None::<SharedContentStore>)));
 
 // load config
 
@@ -156,18 +134,6 @@ pub fn init_config(work_dir: PathBuf, network: Network, passphrase: &str, pd_pas
     }
 }
 
-pub fn recv_evt() -> Result<Event, Error> {
-    match EVT_CHANNEL.1.recv() {
-        Ok(evt) => Ok(evt),
-        Err(err) => Err(Channel_Recv(err))
-    }
-}
-
-pub fn send_cmd(cmd: Command) {
-    CMD_CHANNEL.0.send(cmd.clone()).unwrap();
-    info!("sent cmd: {:?}", cmd);
-}
-
 pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Error> {
     let mut config_path = PathBuf::from(work_dir);
     config_path.push(network.to_string());
@@ -247,56 +213,63 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
     //let store = content_store.clone();
     //thread::Builder::new().name("api".to_string()).spawn(move || start_api(store)).expect("can not start api");
 
+    {
+        let mut cs = CONTENT_STORE.write().unwrap();
+        *cs = Option::Some(content_store.clone());
+    }
+
     let mut thread_pool = ThreadPoolBuilder::new().name_prefix("futures ").create().expect("can not start thread pool");
     P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
                     content_store.clone(), config.birth).start(&mut thread_pool);
 
-    //thread_pool.run(future::pending::<()>());
-    let store = content_store.clone();
-    thread_pool.run(start_api(store));
-    EVT_CHANNEL.0.send(Event::Stopped).unwrap();
+    thread_pool.run(future::pending::<()>());
+    //let store = content_store.clone();
+    // thread_pool.run(start_api(store));
+    // EVT_CHANNEL.0.send(Event::Stopped).unwrap();
     Ok(())
 }
 
-async fn start_api(store: Arc<RwLock<ContentStore>>) -> std::result::Result<(), Error> {
-    info!("start_api");
-    loop {
-        match CMD_CHANNEL.1.try_recv() {
-            Err(_) => {
-                //info!("err: {}", e.to_string());
-                Delay::new(time::Duration::from_millis(100)).await;
-            }
-            Ok(cmd) => {
-                info!("received cmd: {:?}", cmd);
-                match cmd {
-                    Command::Stop => {
-                        EVT_CHANNEL.0.send(Event::Stopped).unwrap();
-                        break;
-                    }
-                    Command::GetBalance => {
-                        let bal_vec = store.read().unwrap().balance();
-                        EVT_CHANNEL.0.send(Event::Balance { balance: bal_vec[0], confirmed: bal_vec[1] }).unwrap();
-                    }
-                    Command::GetDepositAddress => {
-                        let deposit_addr = store.write().unwrap().deposit_address().to_string();
-                        EVT_CHANNEL.0.send(Event::DepositAddress { address: deposit_addr }).unwrap();
-                    }
-                    Command::Withdraw { passphrase, target_address, fee_per_byte, amount } => {
-                        let fee = std::cmp::min(fee_per_byte, 100);
-                        match store.write().unwrap().withdraw(passphrase, target_address, fee, amount) {
-                            Ok((t, _)) => {
-                                EVT_CHANNEL.0.send(Event::WithdrawTx { txid: t.txid() }).unwrap();
-                            },
-                            Err(e) => {
-                                EVT_CHANNEL.0.send(Event::Error { message: e.to_string() }).unwrap();
-                            }
-                        }
-                    }
-                }
-            }
+#[derive(Debug, Clone)]
+pub struct BalanceAmt { pub balance: u64, pub confirmed: u64 }
+
+impl BalanceAmt {
+    fn new(balance: u64, confirmed: u64) -> BalanceAmt {
+        BalanceAmt { balance, confirmed }
+    }
+}
+
+pub fn balance() -> BalanceAmt {
+    let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
+    let bal_vec = store.read().unwrap().balance();
+    BalanceAmt::new(bal_vec[0], bal_vec[1])
+}
+
+pub fn deposit_addr() -> Address {
+    let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
+    let addr = store.write().unwrap().deposit_address();
+    addr
+}
+
+#[derive(Debug, Clone)]
+pub struct WithdrawTx { pub txid: sha256d::Hash, pub fee: u64 }
+
+impl WithdrawTx {
+    fn new(txid: sha256d::Hash, fee: u64) -> WithdrawTx {
+        WithdrawTx { txid, fee }
+    }
+}
+
+pub fn withdraw(passphrase: String, address: Address, fee_per_vbyte: u64, amount: Option<u64>) -> Result<WithdrawTx, Error> {
+    let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
+    let withdraw = store.write().unwrap().withdraw(passphrase, address, fee_per_vbyte, amount);
+    match withdraw {
+        Ok((t, f)) => {
+            Ok(WithdrawTx::new(t.txid(), f))
+        },
+        Err(e) => {
+            Err(e)
         }
     }
-    Ok(())
 }
 
 fn open_db(config_path: &Path) -> DB {
