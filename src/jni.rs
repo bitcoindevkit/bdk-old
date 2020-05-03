@@ -24,11 +24,12 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
-use jni::sys::{jboolean, jint, jobject, jobjectArray};
+use jni::sys::{jboolean, jint, jobject, jobjectArray, jlong};
 
-use crate::api::{init_config, InitResult, load_config, remove_config, start, update_config};
+use crate::api::{init_config, InitResult, load_config, remove_config, start, update_config, stop, balance};
 use crate::config::Config;
 use bitcoin::Network;
+use log::{info, warn, error};
 
 // Optional<Config> org.btcdk.jni.BtcDkLib.loadConfig(String workDir, int network)
 #[no_mangle]
@@ -147,9 +148,34 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_start(env: JNIEnv, _: JObject, 
 
     match start(work_dir, network, rescan) {
         Ok(_) => (),
-        // TODO throw java exception
-        Err(_e) => ()
+        Err(_e) => {
+            // TODO throw java exception
+            error!("Could not start wallet.");
+            ()
+        }
     }
+}
+
+// void org.btcdk.jni.BtcDkLib.stop()
+#[no_mangle]
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_stop(env: JNIEnv) {
+    stop()
+}
+
+// new BalanceAmt(long,long)
+// BalanceAmt org.btcdk.jni.BtcDkLib.balance()
+#[no_mangle]
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv) -> jobject {
+    let balance_amt = balance();
+    let bal = JValue::Long(jlong::try_from(balance_amt.balance).unwrap());
+    let conf = JValue::Long(jlong::try_from(balance_amt.confirmed).unwrap());
+    let j_result = env.new_object(
+        "org/btcdk/jni/BalanceAmt",
+        "(JJ)V",
+        &[bal, conf],
+    ).expect("error new_object BalanceAmt");
+
+    j_result.into_inner()
 }
 
 // private functions

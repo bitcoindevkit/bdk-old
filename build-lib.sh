@@ -1,4 +1,4 @@
-#!/examples/bash
+#!/bin/bash
 cargo build --target x86_64-apple-darwin --release
 cargo ndk --platform 28 --target x86_64-linux-android build --release
 cargo ndk --platform 28 --target aarch64-linux-android build --release

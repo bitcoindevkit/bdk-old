@@ -202,17 +202,6 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
         Arc::new(RwLock::new(
             ContentStore::new(db.clone(), trunk, bitcoin_wallet).expect("can not initialize content store")));
 
-    // if let Some(http) = http_rpc {
-    //     let address = http.clone();
-    //     let store = content_store.clone();
-    //     let apikey = config.apikey.clone();
-    //     thread::Builder::new().name("http".to_string()).spawn(
-    //         move || start_api(&address, store, apikey)).expect("can not start http api");
-    // }
-
-    //let store = content_store.clone();
-    //thread::Builder::new().name("api".to_string()).spawn(move || start_api(store)).expect("can not start api");
-
     {
         let mut cs = CONTENT_STORE.write().unwrap();
         *cs = Option::Some(content_store.clone());
@@ -224,6 +213,11 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
 
     let store = content_store.clone();
     thread_pool.run(check_stopped(store));
+
+    {
+        let mut cs = CONTENT_STORE.write().unwrap();
+        *cs = Option::None;
+    }
     Ok(())
 }
 
@@ -237,6 +231,11 @@ async fn check_stopped(store: Arc<RwLock<ContentStore>>) -> () {
     warn!("stopped");
 }
 
+pub fn stop() -> () {
+    let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
+    store.write().unwrap().set_stopped(true);
+}
+
 #[derive(Debug, Clone)]
 pub struct BalanceAmt { pub balance: u64, pub confirmed: u64 }
 
@@ -244,11 +243,6 @@ impl BalanceAmt {
     fn new(balance: u64, confirmed: u64) -> BalanceAmt {
         BalanceAmt { balance, confirmed }
     }
-}
-
-pub fn stop() -> () {
-    let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
-    store.write().unwrap().set_stopped(true);
 }
 
 pub fn balance() -> BalanceAmt {
