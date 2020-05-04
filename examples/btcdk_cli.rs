@@ -51,7 +51,7 @@ fn main() {
         info!("balance: {:?}", balanceAmt);
 
         let deposit_addr = deposit_addr();
-        info!("deposit addr: {:?}", deposit_addr);
+        info!("deposit addr: {:?}", deposit_addr.address_type());
 
         let withdrawTx = withdraw(PASSPHRASE.to_string(),
                                 Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),

@@ -22,14 +22,16 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
 
+use bitcoin::Network;
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
-use jni::sys::{jboolean, jint, jobject, jobjectArray, jlong};
+use jni::sys::{jboolean, jint, jlong, jobject, jobjectArray};
+use log::{error, info, warn};
 
-use crate::api::{init_config, InitResult, load_config, remove_config, start, update_config, stop, balance};
+use crate::api::{balance, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config};
 use crate::config::Config;
-use bitcoin::Network;
-use log::{info, warn, error};
+
+// public API
 
 // Optional<Config> org.btcdk.jni.BtcDkLib.loadConfig(String workDir, int network)
 #[no_mangle]
@@ -178,6 +180,34 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv) -> jobject
     j_result.into_inner()
 }
 
+// new Address(String address, int network, Optional<String> type)
+// Address org.btcdk.jni.BtcDkLib.depositAddress()
+#[no_mangle]
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_depositAddress(env: JNIEnv) -> jobject {
+    let address = deposit_addr();
+    let addr = address.to_string();
+    let addr = env.new_string(addr).unwrap();
+    let addr = JValue::Object(addr.into());
+    let addr_network = jint_from_network(address.network);
+    let addr_network = JValue::Int(addr_network);
+    let addr_type = address.address_type().map(|t| t.to_string());
+    let addr_type: jobject = match addr_type {
+        Some(at) => j_optional_string(&env, &at),
+        None => j_optional_empty(&env)
+    };
+    let addr_type = JValue::Object(addr_type.into());
+
+    // org.btcdk.jni.Address
+    // Address
+    let j_result = env.new_object(
+        "org/btcdk/jni/Address",
+        "(Ljava/lang/String;ILjava/util/Optional;)V",
+        &[addr, addr_network, addr_type],
+    ).expect("error new_object Address");
+
+    j_result.into_inner()
+}
+
 // private functions
 
 fn string_from_jstring(env: &JNIEnv, j_string: JString) -> String {
@@ -281,6 +311,21 @@ fn j_optional_config(env: &JNIEnv, config: &Config) -> jobject {
         "of",
         "(Ljava/lang/Object;)Ljava/util/Optional;",
         &[JValue::Object(j_result)]).expect("error Optional.of(InitResult)")
+        .l().expect("error converting Optional.of() jvalue to jobject");
+
+    j_result.into_inner()
+}
+
+fn j_optional_string(env: &JNIEnv, string: &String) -> jobject {
+    let j_string = env.new_string(string).unwrap();
+
+    // java.lang.String
+    // Optional.of(String)
+    let j_result = env.call_static_method(
+        "java/util/Optional",
+        "of",
+        "(Ljava/lang/Object;)Ljava/util/Optional;",
+        &[JValue::Object(j_string.into())]).expect("error Optional.of(String)")
         .l().expect("error converting Optional.of() jvalue to jobject");
 
     j_result.into_inner()
