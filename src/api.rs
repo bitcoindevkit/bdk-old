@@ -88,11 +88,11 @@ pub fn update_config(work_dir: PathBuf, network: Network, bitcoin_peers: Vec<Soc
 
 pub struct InitResult {
     pub mnemonic_words: String,
-    pub deposit_address: String,
+    pub deposit_address: Address,
 }
 
 impl InitResult {
-    fn new(mnemonic_words: String, deposit_address: String) -> InitResult {
+    fn new(mnemonic_words: String, deposit_address: Address) -> InitResult {
         InitResult {
             mnemonic_words,
             deposit_address,
@@ -115,7 +115,7 @@ pub fn init_config(work_dir: PathBuf, network: Network, passphrase: &str, pd_pas
         // create new wallet
         let (mnemonic_words, deposit_address, wallet) = Wallet::new(network, passphrase, pd_passphrase);
         let mnemonic_words = mnemonic_words.to_string();
-        let deposit_address = deposit_address.to_string();
+        let deposit_address = deposit_address;
 
         let encryptedwalletkey = hex::encode(wallet.encrypted().as_slice());
         let keyroot = wallet.master_public().to_string();

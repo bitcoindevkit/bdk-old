@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
 
-use bitcoin::Network;
+use bitcoin::{Network, Address};
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jlong, jobject, jobjectArray};
@@ -185,27 +185,7 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv) -> jobject
 #[no_mangle]
 pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_depositAddress(env: JNIEnv) -> jobject {
     let address = deposit_addr();
-    let addr = address.to_string();
-    let addr = env.new_string(addr).unwrap();
-    let addr = JValue::Object(addr.into());
-    let addr_network = jint_from_network(address.network);
-    let addr_network = JValue::Int(addr_network);
-    let addr_type = address.address_type().map(|t| t.to_string());
-    let addr_type: jobject = match addr_type {
-        Some(at) => j_optional_string(&env, &at),
-        None => j_optional_empty(&env)
-    };
-    let addr_type = JValue::Object(addr_type.into());
-
-    // org.btcdk.jni.Address
-    // Address
-    let j_result = env.new_object(
-        "org/btcdk/jni/Address",
-        "(Ljava/lang/String;ILjava/util/Optional;)V",
-        &[addr, addr_network, addr_type],
-    ).expect("error new_object Address");
-
-    j_result.into_inner()
+    j_address(&env, &address)
 }
 
 // private functions
@@ -245,18 +225,17 @@ fn jint_from_network(network: Network) -> jint {
     }
 }
 
-// InitResult(String mnemonicWords, String depositAddress)
+// InitResult(String mnemonicWords, Address depositAddress)
 fn j_optional_init_result(env: &JNIEnv, init_result: InitResult) -> jobject {
     let mnemonic_words = env.new_string(init_result.mnemonic_words)
         .expect("error new_string mnemonic_words");
-    let deposit_address = env.new_string(init_result.deposit_address)
-        .expect("error new_string deposit_address");
+    let deposit_address :jobject = j_address(&env, &init_result.deposit_address);
 
     // org.btcdk.jni.InitResult
     // Optional.of(InitResult(String mnemonicWords, String depositAddress))
     let j_result = env.new_object(
         "org/btcdk/jni/InitResult",
-        "(Ljava/lang/String;Ljava/lang/String;)V",
+        "(Ljava/lang/String;Lorg/btcdk/jni/Address;)V",
         &[JValue::Object(mnemonic_words.into()), JValue::Object(deposit_address.into())],
     ).expect("error new_object InitResult");
 
@@ -327,6 +306,30 @@ fn j_optional_string(env: &JNIEnv, string: &String) -> jobject {
         "(Ljava/lang/Object;)Ljava/util/Optional;",
         &[JValue::Object(j_string.into())]).expect("error Optional.of(String)")
         .l().expect("error converting Optional.of() jvalue to jobject");
+
+    j_result.into_inner()
+}
+
+fn j_address(env: &JNIEnv, address: &Address) -> jobject {
+    let addr = address.to_string();
+    let addr = env.new_string(addr).unwrap();
+    let addr = JValue::Object(addr.into());
+    let addr_network = jint_from_network(address.network);
+    let addr_network = JValue::Int(addr_network);
+    let addr_type = address.address_type().map(|t| t.to_string());
+    let addr_type: jobject = match addr_type {
+        Some(at) => j_optional_string(&env, &at),
+        None => j_optional_empty(&env)
+    };
+    let addr_type = JValue::Object(addr_type.into());
+
+    // org.btcdk.jni.Address
+    // Address
+    let j_result = env.new_object(
+        "org/btcdk/jni/Address",
+        "(Ljava/lang/String;ILjava/util/Optional;)V",
+        &[addr, addr_network, addr_type],
+    ).expect("error new_object Address");
 
     j_result.into_inner()
 }
