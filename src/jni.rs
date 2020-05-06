@@ -28,7 +28,7 @@ use jni::objects::{JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jlong, jobject, jobjectArray};
 use log::{error, info, warn};
 
-use crate::api::{balance, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config};
+use crate::api::{balance, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config, withdraw, WithdrawTx};
 use crate::config::Config;
 
 // public API
@@ -160,14 +160,14 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_start(env: JNIEnv, _: JObject, 
 
 // void org.btcdk.jni.BtcDkLib.stop()
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_stop(env: JNIEnv) {
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_stop(env: JNIEnv, _: JObject) {
     stop()
 }
 
 // new BalanceAmt(long,long)
 // BalanceAmt org.btcdk.jni.BtcDkLib.balance()
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv) -> jobject {
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv, _: JObject) -> jobject {
     let balance_amt = balance();
     let bal = JValue::Long(jlong::try_from(balance_amt.balance).unwrap());
     let conf = JValue::Long(jlong::try_from(balance_amt.confirmed).unwrap());
@@ -183,10 +183,31 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv) -> jobject
 // new Address(String address, int network, Optional<String> type)
 // Address org.btcdk.jni.BtcDkLib.depositAddress()
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_depositAddress(env: JNIEnv) -> jobject {
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_depositAddress(env: JNIEnv, _: JObject) -> jobject {
     let address = deposit_addr();
     j_address(&env, &address)
 }
+
+// new WithdrawTx(String txid, long fee)
+// WithdrawTx org.btcdk.jni.BtcDkLib.withdraw(String passphrase, String address, long feePerVbyte, long amount)
+#[no_mangle]
+pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_withdraw(env: JNIEnv, _: JObject,
+                                                          j_passphrase: JString,
+                                                          j_address: JString,
+                                                          j_fee_per_vbyte: jlong,
+                                                          j_amount: jlong) -> jobject {
+
+    let passphrase = string_from_jstring(&env, j_passphrase);
+    let address = string_from_jstring(&env, j_address);
+    let address = Address::from_str(address.as_str()).unwrap();
+
+    let fee_per_vbyte = u64::try_from(j_fee_per_vbyte).unwrap();
+    let amount = u64::try_from(j_amount).unwrap();
+
+    let withdraw_tx = withdraw(passphrase, address, fee_per_vbyte, Some(amount)).unwrap();
+    j_withdraw_tx(&env, &withdraw_tx)
+}
+
 
 // private functions
 
@@ -229,7 +250,7 @@ fn jint_from_network(network: Network) -> jint {
 fn j_optional_init_result(env: &JNIEnv, init_result: InitResult) -> jobject {
     let mnemonic_words = env.new_string(init_result.mnemonic_words)
         .expect("error new_string mnemonic_words");
-    let deposit_address :jobject = j_address(&env, &init_result.deposit_address);
+    let deposit_address: jobject = j_address(&env, &init_result.deposit_address);
 
     // org.btcdk.jni.InitResult
     // Optional.of(InitResult(String mnemonicWords, String depositAddress))
@@ -310,6 +331,7 @@ fn j_optional_string(env: &JNIEnv, string: &String) -> jobject {
     j_result.into_inner()
 }
 
+// org.btcdk.jni.Address(String address, int networkEnumOrdinal, Optional<String> type)
 fn j_address(env: &JNIEnv, address: &Address) -> jobject {
     let addr = address.to_string();
     let addr = env.new_string(addr).unwrap();
@@ -323,13 +345,26 @@ fn j_address(env: &JNIEnv, address: &Address) -> jobject {
     };
     let addr_type = JValue::Object(addr_type.into());
 
-    // org.btcdk.jni.Address
-    // Address
     let j_result = env.new_object(
         "org/btcdk/jni/Address",
         "(Ljava/lang/String;ILjava/util/Optional;)V",
         &[addr, addr_network, addr_type],
     ).expect("error new_object Address");
+
+    j_result.into_inner()
+}
+
+// org.btcdk.jni.WithdrawTx(String txid, long fee)
+fn j_withdraw_tx(env: &JNIEnv, withdraw_tx: &WithdrawTx) -> jobject {
+    let txid = withdraw_tx.txid.to_string();
+    let txid = env.new_string(txid).unwrap();
+    let fee = i64::try_from(withdraw_tx.fee).unwrap();
+
+    let j_result = env.new_object(
+        "org/btcdk/jni/WithdrawTx",
+        "(Ljava/lang/String;J)V",
+        &[JValue::Object(txid.into()), JValue::Long(fee)],
+    ).expect("error new_object WithdrawTx");
 
     j_result.into_inner()
 }

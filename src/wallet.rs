@@ -178,10 +178,10 @@ impl Wallet {
         Ok((tx, funder, fee))
     }
 
-    pub fn withdraw(&mut self, passpharse: String, address: Address, mut fee_per_vbyte: u64, amount: Option<u64>, trunk: Arc<dyn Trunk>) -> Result<(Transaction, u64), Error> {
+    pub fn withdraw(&mut self, passphrase: String, address: Address, mut fee_per_vbyte: u64, amount: Option<u64>, trunk: Arc<dyn Trunk>) -> Result<(Transaction, u64), Error> {
         let network = self.master.master_public().network;
         let mut unlocker = Unlocker::new(
-            self.master.encrypted(), passpharse.as_str(),
+            self.master.encrypted(), passphrase.as_str(),
             network, Some(self.master.master_public()))?;
         let height = trunk.len();
         let balance = self.available_balance(height, |h| trunk.get_height(h));

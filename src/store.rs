@@ -116,8 +116,8 @@ impl ContentStore {
         Address::p2wsh(&Self::funding_script(tweaked, term), Network::Bitcoin)
     }
 
-    pub fn withdraw(&mut self, passpharse: String, address: Address, fee_per_vbyte: u64, amount: Option<u64>) -> Result<(Transaction, u64), Error> {
-        let (transaction, fee) = self.wallet.withdraw(passpharse, address, fee_per_vbyte, amount, self.trunk.clone())?;
+    pub fn withdraw(&mut self, passphrase: String, address: Address, fee_per_vbyte: u64, amount: Option<u64>) -> Result<(Transaction, u64), Error> {
+        let (transaction, fee) = self.wallet.withdraw(passphrase, address, fee_per_vbyte, amount, self.trunk.clone())?;
         let mut db = self.db.lock().unwrap();
         let mut tx = db.transaction();
         tx.store_account(&self.wallet.master.get((0, 1)).unwrap())?;
