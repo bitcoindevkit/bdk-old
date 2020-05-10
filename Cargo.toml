@@ -8,7 +8,7 @@ edition = "2018"
 
 [lib]
 name = "btcdk"
-crate-type = ["cdylib"]
+crate-type = ["lib","cdylib"]
 
 [dependencies]
 jni = { version = "0.13.1", default-features = false }

@@ -141,6 +141,7 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
     let mut config_file_path = config_path.clone();
     config_file_path.push(CONFIG_FILE_NAME);
 
+    info!("config file path: {}", &config_file_path.to_str().unwrap());
     let config = config::load(&config_file_path).expect("can not open config file");
 
     let mut chain_file_path = config_path.clone();
