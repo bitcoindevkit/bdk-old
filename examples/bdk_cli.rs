@@ -1,6 +1,6 @@
 /*
  * Copyright 2019 Tamas Blummer
- * Copyright 2020 BTCDK Team
+ * Copyright 2020 BDK Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-extern crate btcdk;
+extern crate bdk;
 
 use env_logger::Env;
 use std::path::PathBuf;
@@ -22,9 +22,9 @@ use bitcoin::{Network, Address};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use log::{info, warn, error};
-use btcdk::api::{init_config, update_config, start, balance, deposit_addr, withdraw, stop};
+use bdk::api::{init_config, update_config, start, balance, deposit_addr, withdraw, stop};
 use std::thread;
-use btcdk::api;
+use bdk::api;
 use bitcoin_hashes::core::time::Duration;
 
 const PASSPHRASE: &str = "correct horse battery staple";

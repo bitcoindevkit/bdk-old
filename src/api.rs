@@ -1,6 +1,6 @@
 /*
  * Copyright 2019 Tamas Blummer
- * Copyright 2020 BTCDK Team
+ * Copyright 2020 BDK Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ use std::thread::spawn;
 use std::time::Duration;
 use bitcoin_hashes::sha256d;
 
-const CONFIG_FILE_NAME: &str = "btcdk.cfg";
+const CONFIG_FILE_NAME: &str = "bdk.cfg";
 
 static CONTENT_STORE: Lazy<Arc<RwLock<Option<SharedContentStore>>>> = Lazy::new(|| Arc::new(RwLock::new(None::<SharedContentStore>)));
 
@@ -145,7 +145,7 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
     let config = config::load(&config_file_path).expect("can not open config file");
 
     let mut chain_file_path = config_path.clone();
-    chain_file_path.push("btcdk.chain");
+    chain_file_path.push("bdk.chain");
 
     let mut chain_db = ChainDB::new(chain_file_path.as_path(), network).expect("can not open chain db");
     chain_db.init().expect("can not initialize db");
@@ -282,7 +282,7 @@ pub fn withdraw(passphrase: String, address: Address, fee_per_vbyte: u64, amount
 
 fn open_db(config_path: &Path) -> DB {
     let mut db_path = PathBuf::from(config_path);
-    const DB_FILE_NAME: &str = "btcdk.db";
+    const DB_FILE_NAME: &str = "bdk.db";
     db_path.push(DB_FILE_NAME);
     let db = DB::new(db_path.as_path()).expect(format!("Can't open DB {}", db_path.to_str().expect("can't get db_path")).as_str());
     db

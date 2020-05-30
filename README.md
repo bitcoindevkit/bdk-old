@@ -1,5 +1,5 @@
-BTC Development Kit
-===================
+Bitcoin Development Kit
+=======================
 
 This library combines rust-bitcoin and rust-wallet libraries to provide basic functionality for interacting with the 
 bitcoin network.

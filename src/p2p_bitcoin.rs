@@ -1,6 +1,6 @@
 /*
  * Copyright 2019 Tamas Blummer
- * Copyright 2020 BTCDK Team
+ * Copyright 2020 BDK Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ impl P2PBitcoin {
             nonce: thread_rng().next_u64(),
             network: self.network,
             max_protocol_version: MAX_PROTOCOL_VERSION,
-            user_agent: "btcdk 0.1.0".to_string(),
+            user_agent: "bdk 0.1.0".to_string(),
             server: false,
             height
         };

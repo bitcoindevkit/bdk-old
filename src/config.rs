@@ -1,6 +1,6 @@
 /*
  * Copyright 2019 Tamas Blummer
- * Copyright 2020 BTCDK Team
+ * Copyright 2020 BDK Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ mod test {
         let mut config_path = workdir_path.clone();
         config_path.push(test_config.network.to_string());
         let mut file_path = config_path.clone();
-        file_path.push("btcdk.cfg");
+        file_path.push("bdk.cfg");
 
         assert_eq!(config::save(&config_path, &file_path, &test_config).is_ok(), true);
         let loaded = config::load(&file_path);
@@ -136,7 +136,7 @@ mod test {
         let mut config_path = workdir_path.clone();
         config_path.push(test_config.network.to_string());
         let mut file_path = config_path.clone();
-        file_path.push("btcdk.cfg");
+        file_path.push("bdk.cfg");
 
         assert_eq!(config::save(&config_path, &file_path, &test_config).is_ok(), true);
 

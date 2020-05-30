@@ -1,6 +1,6 @@
 /*
  * Copyright 2019 Tamas Blummer
- * Copyright 2020 BTCDK Team
+ * Copyright 2020 BDK Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -469,7 +469,7 @@ pub fn init(config_path: &Path, coins: &Coins, master: &MasterAccount) {
 
 pub fn new(config_path: &Path) -> DB {
     let mut db_path = PathBuf::from(config_path);
-    db_path.push("btcdk.db");
+    db_path.push("bdk.db");
     DB::new(db_path.as_path()).expect("can not open database")
 }
 

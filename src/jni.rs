@@ -1,6 +1,6 @@
 /*
  * Copyright 2019 Tamas Blummer
- * Copyright 2020 BTCDK Team
+ * Copyright 2020 BDK Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ use crate::config::Config;
 
 // public API
 
-// Optional<Config> org.btcdk.jni.BtcDkLib.loadConfig(String workDir, int network)
+// Optional<Config> org.bdk.jni.BdkLib.loadConfig(String workDir, int network)
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_loadConfig(env: JNIEnv, _: JObject,
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_loadConfig(env: JNIEnv, _: JObject,
                                                             j_work_dir: JString,
                                                             j_network: jint) -> jobject {
     let work_dir = string_from_jstring(&env, j_work_dir);
@@ -48,9 +48,9 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_loadConfig(env: JNIEnv, _: JObj
     }
 }
 
-// Optional<Config> org.btcdk.jni.BtcDkLib.removeConfig(String workDir, int network)
+// Optional<Config> org.bdk.jni.BdkLib.removeConfig(String workDir, int network)
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_removeConfig(env: JNIEnv, _: JObject,
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_removeConfig(env: JNIEnv, _: JObject,
                                                               j_work_dir: JString,
                                                               j_network: jint) -> jobject {
     let work_dir = string_from_jstring(&env, j_work_dir);
@@ -63,9 +63,9 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_removeConfig(env: JNIEnv, _: JO
     }
 }
 
-// Optional<Config> org.btcdk.jni.BtcDkLib.updateConfig(String workDir, int network, String[] bitcoinPeers, int bitcoinConnections, boolean bitcoinDiscovery)
+// Optional<Config> org.bdk.jni.BdkLib.updateConfig(String workDir, int network, String[] bitcoinPeers, int bitcoinConnections, boolean bitcoinDiscovery)
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_updateConfig(env: JNIEnv, _: JObject,
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_updateConfig(env: JNIEnv, _: JObject,
                                                               j_work_dir: JString,
                                                               j_network: jint,
                                                               j_bitcoin_peers: jobjectArray,
@@ -106,9 +106,9 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_updateConfig(env: JNIEnv, _: JO
     }
 }
 
-// Optional<InitResult> org.btcdk.jni.BtcDkLib.initConfig(String workDir, int network, String passphrase, String pdPassphrase)
+// Optional<InitResult> org.bdk.jni.BdkLib.initConfig(String workDir, int network, String passphrase, String pdPassphrase)
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_initConfig(env: JNIEnv, _: JObject,
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_initConfig(env: JNIEnv, _: JObject,
                                                             j_work_dir: JString,
                                                             j_network: jint,
                                                             j_passphrase: JString,
@@ -140,9 +140,9 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_initConfig(env: JNIEnv, _: JObj
     }
 }
 
-// void org.btcdk.jni.BtcDkLib.start(String workDir, int network, boolean rescan)
+// void org.bdk.jni.BdkLib.start(String workDir, int network, boolean rescan)
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_start(env: JNIEnv, _: JObject, j_work_dir: JString, j_network: jint, j_rescan: jboolean) {
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_start(env: JNIEnv, _: JObject, j_work_dir: JString, j_network: jint, j_rescan: jboolean) {
     let work_dir = string_from_jstring(&env, j_work_dir);
     let work_dir = PathBuf::from(work_dir);
     let network = network_from_jint(j_network);
@@ -158,21 +158,21 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_start(env: JNIEnv, _: JObject, 
     }
 }
 
-// void org.btcdk.jni.BtcDkLib.stop()
+// void org.bdk.jni.BdkLib.stop()
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_stop(env: JNIEnv, _: JObject) {
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_stop(env: JNIEnv, _: JObject) {
     stop()
 }
 
 // new BalanceAmt(long,long)
-// BalanceAmt org.btcdk.jni.BtcDkLib.balance()
+// BalanceAmt org.bdk.jni.BdkLib.balance()
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv, _: JObject) -> jobject {
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_balance(env: JNIEnv, _: JObject) -> jobject {
     let balance_amt = balance();
     let bal = JValue::Long(jlong::try_from(balance_amt.balance).unwrap());
     let conf = JValue::Long(jlong::try_from(balance_amt.confirmed).unwrap());
     let j_result = env.new_object(
-        "org/btcdk/jni/BalanceAmt",
+        "org/bdk/jni/BalanceAmt",
         "(JJ)V",
         &[bal, conf],
     ).expect("error new_object BalanceAmt");
@@ -181,17 +181,17 @@ pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_balance(env: JNIEnv, _: JObject
 }
 
 // new Address(String address, int network, Optional<String> type)
-// Address org.btcdk.jni.BtcDkLib.depositAddress()
+// Address org.bdk.jni.BdkLib.depositAddress()
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_depositAddress(env: JNIEnv, _: JObject) -> jobject {
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_depositAddress(env: JNIEnv, _: JObject) -> jobject {
     let address = deposit_addr();
     j_address(&env, &address)
 }
 
 // new WithdrawTx(String txid, long fee)
-// WithdrawTx org.btcdk.jni.BtcDkLib.withdraw(String passphrase, String address, long feePerVbyte, long amount)
+// WithdrawTx org.bdk.jni.BdkLib.withdraw(String passphrase, String address, long feePerVbyte, long amount)
 #[no_mangle]
-pub unsafe extern fn Java_org_btcdk_jni_BtcDkLib_withdraw(env: JNIEnv, _: JObject,
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_withdraw(env: JNIEnv, _: JObject,
                                                           j_passphrase: JString,
                                                           j_address: JString,
                                                           j_fee_per_vbyte: jlong,
@@ -252,11 +252,11 @@ fn j_optional_init_result(env: &JNIEnv, init_result: InitResult) -> jobject {
         .expect("error new_string mnemonic_words");
     let deposit_address: jobject = j_address(&env, &init_result.deposit_address);
 
-    // org.btcdk.jni.InitResult
+    // org.bdk.jni.InitResult
     // Optional.of(InitResult(String mnemonicWords, String depositAddress))
     let j_result = env.new_object(
-        "org/btcdk/jni/InitResult",
-        "(Ljava/lang/String;Lorg/btcdk/jni/Address;)V",
+        "org/bdk/jni/InitResult",
+        "(Ljava/lang/String;Lorg/bdk/jni/Address;)V",
         &[JValue::Object(mnemonic_words.into()), JValue::Object(deposit_address.into())],
     ).expect("error new_object InitResult");
 
@@ -297,10 +297,10 @@ fn j_optional_config(env: &JNIEnv, config: &Config) -> jobject {
     let j_bitcoin_discover: JValue = jboolean::try_from(config.bitcoin_discovery)
         .expect("error converting bitcoin_discovery to jboolean").into();
 
-    // org.btcdk.jni.Config
+    // org.bdk.jni.Config
     // Optional.of(Config())
     let j_result = env.new_object(
-        "org/btcdk/jni/Config",
+        "org/bdk/jni/Config",
         "(I[Ljava/lang/String;IZ)V",
         &[j_network_enum_ordinal, JValue::Object(j_bitcoin_peer_arr.into()),
             j_bitcoin_connections, j_bitcoin_discover],
@@ -331,7 +331,7 @@ fn j_optional_string(env: &JNIEnv, string: &String) -> jobject {
     j_result.into_inner()
 }
 
-// org.btcdk.jni.Address(String address, int networkEnumOrdinal, Optional<String> type)
+// org.bdk.jni.Address(String address, int networkEnumOrdinal, Optional<String> type)
 fn j_address(env: &JNIEnv, address: &Address) -> jobject {
     let addr = address.to_string();
     let addr = env.new_string(addr).unwrap();
@@ -346,7 +346,7 @@ fn j_address(env: &JNIEnv, address: &Address) -> jobject {
     let addr_type = JValue::Object(addr_type.into());
 
     let j_result = env.new_object(
-        "org/btcdk/jni/Address",
+        "org/bdk/jni/Address",
         "(Ljava/lang/String;ILjava/util/Optional;)V",
         &[addr, addr_network, addr_type],
     ).expect("error new_object Address");
@@ -354,14 +354,14 @@ fn j_address(env: &JNIEnv, address: &Address) -> jobject {
     j_result.into_inner()
 }
 
-// org.btcdk.jni.WithdrawTx(String txid, long fee)
+// org.bdk.jni.WithdrawTx(String txid, long fee)
 fn j_withdraw_tx(env: &JNIEnv, withdraw_tx: &WithdrawTx) -> jobject {
     let txid = withdraw_tx.txid.to_string();
     let txid = env.new_string(txid).unwrap();
     let fee = i64::try_from(withdraw_tx.fee).unwrap();
 
     let j_result = env.new_object(
-        "org/btcdk/jni/WithdrawTx",
+        "org/bdk/jni/WithdrawTx",
         "(Ljava/lang/String;J)V",
         &[JValue::Object(txid.into()), JValue::Long(fee)],
     ).expect("error new_object WithdrawTx");
