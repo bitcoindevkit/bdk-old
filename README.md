@@ -62,3 +62,9 @@ bitcoin network.
    ```
    ./build-lib.sh
    ```
+   
+## REGTEST Testing
+
+1. Clone [bitcoin-regtest-box project](https://github.com/bitcoindevkit/bitcoin-regtest-box) and follow
+   [README.md](https://github.com/bitcoindevkit/bitcoin-regtest-box/blob/master/README.md) instructions to start 
+   localhost REGTEST bitcoind nodes.
