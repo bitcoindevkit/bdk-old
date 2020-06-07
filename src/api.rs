@@ -18,13 +18,13 @@
 use std::{fs, thread, io, time};
 use std::net::SocketAddr;
 use std::path::{PathBuf, Path};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, PoisonError, RwLockWriteGuard, RwLockReadGuard};
 
 use bitcoin::{BitcoinHash, Network, Address};
 use bitcoin::hashes::core::str::FromStr;
 use bitcoin::util::bip32::ExtendedPubKey;
 use bitcoin_wallet::account::MasterAccount;
-use futures::{executor::ThreadPoolBuilder, future};
+use futures::{executor::ThreadPoolBuilder, future, TryFutureExt};
 use murmel::chaindb::ChainDB;
 
 use crate::config::Config;
@@ -41,6 +41,7 @@ use futures_timer::Delay;
 use std::thread::spawn;
 use std::time::Duration;
 use bitcoin_hashes::sha256d;
+use crate::error::Error::Lock;
 
 const CONFIG_FILE_NAME: &str = "bdk.cfg";
 
@@ -135,89 +136,106 @@ pub fn init_config(work_dir: PathBuf, network: Network, passphrase: &str, pd_pas
 }
 
 pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Error> {
-    let mut config_path = PathBuf::from(work_dir);
-    config_path.push(network.to_string());
 
-    let mut config_file_path = config_path.clone();
-    config_file_path.push(CONFIG_FILE_NAME);
+    let p2p_bitcoin;
+    let content_store;
 
-    info!("config file path: {}", &config_file_path.to_str().unwrap());
-    let config = config::load(&config_file_path).expect("can not open config file");
+    match CONTENT_STORE.write() {
+        Err(e) => {
+            error!("{:?}", e);
+            return Ok(());
+        }
+        Ok(mut cs) => {
+            if cs.is_some() {
+                debug!("content store exists");
+                return Ok(());
+            } else {
+                debug!("content store not initialized");
 
-    let mut chain_file_path = config_path.clone();
-    chain_file_path.push("bdk.chain");
+                let mut config_path = PathBuf::from(work_dir);
+                config_path.push(network.to_string());
 
-    let mut chain_db = ChainDB::new(chain_file_path.as_path(), network).expect("can not open chain db");
-    chain_db.init().expect("can not initialize db");
-    let chain_db = Arc::new(RwLock::new(chain_db));
+                let mut config_file_path = config_path.clone();
+                config_file_path.push(CONFIG_FILE_NAME);
 
-    let db = open_db(&config_path);
-    let db = Arc::new(Mutex::new(db));
+                info!("config file path: {}", &config_file_path.to_str().unwrap());
+                let config = config::load(&config_file_path).expect("can not open config file");
 
-    // get master account
-    let mut bitcoin_wallet;
-    let mut master_account = MasterAccount::from_encrypted(
-        hex::decode(config.encryptedwalletkey).expect("encryptedwalletkey is not hex").as_slice(),
-        ExtendedPubKey::from_str(config.keyroot.as_str()).expect("keyroot is malformed"),
-        config.birth,
-    );
+                let mut chain_file_path = config_path.clone();
+                chain_file_path.push("bdk.chain");
 
-    // load wallet from master account
-    {
-        let mut db = db.lock().unwrap();
-        let mut tx = db.transaction();
-        let account = tx.read_account(0, 0, network, config.lookahead).expect("can not read account 0/0");
-        master_account.add_account(account);
-        let account = tx.read_account(0, 1, network, config.lookahead).expect("can not read account 0/1");
-        master_account.add_account(account);
-        let account = tx.read_account(1, 0, network, 0).expect("can not read account 1/0");
-        master_account.add_account(account);
-        let coins = tx.read_coins(&mut master_account).expect("can not read coins");
-        bitcoin_wallet = Wallet::from_storage(coins, master_account);
-    }
+                let mut chain_db = ChainDB::new(chain_file_path.as_path(), network).expect("can not open chain db");
+                chain_db.init().expect("can not initialize db");
+                let chain_db = Arc::new(RwLock::new(chain_db));
 
-    // rescan chain if requested
-    if rescan {
-        let chain_db = chain_db.read().unwrap();
-        let mut after = None;
-        for cached_header in chain_db.iter_trunk_rev(None) {
-            if (cached_header.stored.header.time as u64) < config.birth {
-                after = Some(cached_header.bitcoin_hash());
-                break;
+                let db = open_db(&config_path);
+                let db = Arc::new(Mutex::new(db));
+
+                // get master account
+                let mut bitcoin_wallet;
+                let mut master_account = MasterAccount::from_encrypted(
+                    hex::decode(config.encryptedwalletkey).expect("encryptedwalletkey is not hex").as_slice(),
+                    ExtendedPubKey::from_str(config.keyroot.as_str()).expect("keyroot is malformed"),
+                    config.birth,
+                );
+
+                // load wallet from master account
+                {
+                    let mut db = db.lock().unwrap();
+                    let mut tx = db.transaction();
+                    let account = tx.read_account(0, 0, network, config.lookahead).expect("can not read account 0/0");
+                    master_account.add_account(account);
+                    let account = tx.read_account(0, 1, network, config.lookahead).expect("can not read account 0/1");
+                    master_account.add_account(account);
+                    let account = tx.read_account(1, 0, network, 0).expect("can not read account 1/0");
+                    master_account.add_account(account);
+                    let coins = tx.read_coins(&mut master_account).expect("can not read coins");
+                    bitcoin_wallet = Wallet::from_storage(coins, master_account);
+                }
+
+                // rescan chain if requested
+                if rescan {
+                    let chain_db = chain_db.read().unwrap();
+                    let mut after = None;
+                    for cached_header in chain_db.iter_trunk_rev(None) {
+                        if (cached_header.stored.header.time as u64) < config.birth {
+                            after = Some(cached_header.bitcoin_hash());
+                            break;
+                        }
+                    }
+                    if let Some(after) = after {
+                        info!("Re-scanning after block {}", &after);
+                        let mut db = db.lock().unwrap();
+                        let mut tx = db.transaction();
+                        tx.rescan(&after).expect("can not re-scan");
+                        tx.commit();
+                        bitcoin_wallet.rescan();
+                    }
+                }
+
+                let trunk = Arc::new(ChainDBTrunk { chaindb: chain_db.clone() });
+                info!("Wallet balance: {} satoshis {} available", bitcoin_wallet.balance(), bitcoin_wallet.available_balance(trunk.len(), |h| trunk.get_height(h)));
+
+                content_store =
+                    Arc::new(RwLock::new(
+                        ContentStore::new(db.clone(), trunk, bitcoin_wallet).expect("can not initialize content store")));
+
+                *cs = Option::Some(content_store.clone());
+
+                p2p_bitcoin = P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
+                                content_store.clone(), config.birth);
             }
         }
-        if let Some(after) = after {
-            info!("Re-scanning after block {}", &after);
-            let mut db = db.lock().unwrap();
-            let mut tx = db.transaction();
-            tx.rescan(&after).expect("can not re-scan");
-            tx.commit();
-            bitcoin_wallet.rescan();
-        }
-    }
-
-    let trunk = Arc::new(ChainDBTrunk { chaindb: chain_db.clone() });
-    info!("Wallet balance: {} satoshis {} available", bitcoin_wallet.balance(), bitcoin_wallet.available_balance(trunk.len(), |h| trunk.get_height(h)));
-
-    let content_store =
-        Arc::new(RwLock::new(
-            ContentStore::new(db.clone(), trunk, bitcoin_wallet).expect("can not initialize content store")));
-
-    {
-        let mut cs = CONTENT_STORE.write().unwrap();
-        *cs = Option::Some(content_store.clone());
     }
 
     let mut thread_pool = ThreadPoolBuilder::new().name_prefix("futures ").create().expect("can not start thread pool");
-    P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
-                    content_store.clone(), config.birth).start(&mut thread_pool);
-
-    let store = content_store.clone();
-    thread_pool.run(check_stopped(store));
+    p2p_bitcoin.start(&mut thread_pool);
+    thread_pool.run(check_stopped(content_store));
 
     {
         let mut cs = CONTENT_STORE.write().unwrap();
         *cs = Option::None;
+        debug!("content store set to None")
     }
     Ok(())
 }
@@ -233,6 +251,7 @@ async fn check_stopped(store: Arc<RwLock<ContentStore>>) -> () {
 }
 
 pub fn stop() -> () {
+    info!("stopping");
     let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
     store.write().unwrap().set_stopped(true);
 }
@@ -246,10 +265,10 @@ impl BalanceAmt {
     }
 }
 
-pub fn balance() -> BalanceAmt {
+pub fn balance() -> Result<BalanceAmt, Error> {
     let store = CONTENT_STORE.read().unwrap().as_ref().unwrap().clone();
     let bal_vec = store.read().unwrap().balance();
-    BalanceAmt::new(bal_vec[0], bal_vec[1])
+    Ok(BalanceAmt::new(bal_vec[0], bal_vec[1]))
 }
 
 pub fn deposit_addr() -> Address {
@@ -273,7 +292,7 @@ pub fn withdraw(passphrase: String, address: Address, fee_per_vbyte: u64, amount
     match withdraw {
         Ok((t, f)) => {
             Ok(WithdrawTx::new(t.txid(), f))
-        },
+        }
         Err(e) => {
             Err(e)
         }
@@ -296,7 +315,9 @@ mod test {
     use std::str::FromStr;
     use env_logger::Env;
     use log::info;
-    use crate::api::{init_config, update_config, remove_config};
+    use crate::api::{init_config, update_config, remove_config, start, stop};
+    use std::thread;
+    use std::time::Duration;
 
     const PASSPHRASE: &str = "correct horse battery staple";
     const PD_PASSPHRASE_1: &str = "test123";
@@ -322,5 +343,37 @@ mod test {
         assert_eq!(removed.bitcoin_peers[1], peer2);
         assert_eq!(removed.bitcoin_connections, 3);
         assert!(removed.bitcoin_discovery);
+    }
+
+    #[test]
+    fn init_start_stop_remove_config() {
+        env_logger::from_env(Env::default().default_filter_or("info")).init();
+        info!("TEST init_start_stop_remove_config()");
+
+        let work_dir: PathBuf = PathBuf::from(".");
+
+        let inited = init_config(work_dir.clone(), Network::Regtest,
+                                 PASSPHRASE, Some(PD_PASSPHRASE_1)).unwrap();
+
+        thread::spawn(move || {
+            info!("start 1");
+            let work_dir: PathBuf = PathBuf::from(".");
+            assert_eq!(start(work_dir, Network::Regtest, false).unwrap(), ());
+            info!("start 1 returned")
+        });
+
+        thread::spawn(move || {
+            info!("start 2");
+            let work_dir: PathBuf = PathBuf::from(".");
+            assert_eq!(start(work_dir, Network::Regtest, false).unwrap(), ());
+            debug!("start 2 returned")
+        });
+
+        thread::sleep(Duration::from_millis(1000));
+        assert_eq!(stop(), ());
+        info!("stop returned");
+
+        remove_config(work_dir.clone(), Network::Regtest).unwrap();
+        info!("removed config");
     }
 }

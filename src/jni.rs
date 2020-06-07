@@ -28,10 +28,17 @@ use jni::objects::{JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jlong, jobject, jobjectArray};
 use log::{error, info, warn};
 
-use crate::api::{balance, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config, withdraw, WithdrawTx};
+use crate::api::{balance, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config, withdraw, WithdrawTx, BalanceAmt};
 use crate::config::Config;
 
 // public API
+
+// void org.bdk.jni.BdkLib.initLogger()
+#[no_mangle]
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(env: JNIEnv, _: JObject) {
+    android_log::init("BDK").unwrap();
+    info!("android logger initialized");
+}
 
 // Optional<Config> org.bdk.jni.BdkLib.loadConfig(String workDir, int network)
 #[no_mangle]
@@ -164,20 +171,20 @@ pub unsafe extern fn Java_org_bdk_jni_BdkLib_stop(env: JNIEnv, _: JObject) {
     stop()
 }
 
-// new BalanceAmt(long,long)
-// BalanceAmt org.bdk.jni.BdkLib.balance()
+// Option<BalanceAmt> org.bdk.jni.BdkLib.balance()
 #[no_mangle]
 pub unsafe extern fn Java_org_bdk_jni_BdkLib_balance(env: JNIEnv, _: JObject) -> jobject {
-    let balance_amt = balance();
-    let bal = JValue::Long(jlong::try_from(balance_amt.balance).unwrap());
-    let conf = JValue::Long(jlong::try_from(balance_amt.confirmed).unwrap());
-    let j_result = env.new_object(
-        "org/bdk/jni/BalanceAmt",
-        "(JJ)V",
-        &[bal, conf],
-    ).expect("error new_object BalanceAmt");
-
-    j_result.into_inner()
+    match balance() {
+        Ok(balance_amt) => {
+            // return wallet balance amt
+            j_optional_balance_amt_result(&env, balance_amt)
+        },
+        Err(_e) => {
+            // TODO throw java exception
+            error!("Could not get wallet balance amt.");
+            j_optional_empty(&env)
+        }
+    }
 }
 
 // new Address(String address, int network, Optional<String> type)
@@ -265,6 +272,26 @@ fn j_optional_init_result(env: &JNIEnv, init_result: InitResult) -> jobject {
         "of",
         "(Ljava/lang/Object;)Ljava/util/Optional;",
         &[JValue::Object(j_result)]).expect("error Optional.of(InitResult)")
+        .l().expect("error converting Optional.of() jvalue to jobject");
+
+    j_result.into_inner()
+}
+
+// new BalanceAmt(long,long)
+fn j_optional_balance_amt_result(env: &JNIEnv, balance_amt: BalanceAmt) -> jobject {
+    let bal = JValue::Long(jlong::try_from(balance_amt.balance).unwrap());
+    let conf = JValue::Long(jlong::try_from(balance_amt.confirmed).unwrap());
+    let j_result = env.new_object(
+        "org/bdk/jni/BalanceAmt",
+        "(JJ)V",
+        &[bal, conf],
+    ).expect("error new_object BalanceAmt");
+
+    let j_result = env.call_static_method(
+        "java/util/Optional",
+        "of",
+        "(Ljava/lang/Object;)Ljava/util/Optional;",
+        &[JValue::Object(j_result)]).expect("error Optional.of(BalanceAmt)")
         .l().expect("error converting Optional.of() jvalue to jobject");
 
     j_result.into_inner()

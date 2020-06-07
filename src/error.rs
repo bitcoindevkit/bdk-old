@@ -26,6 +26,8 @@ use rusqlite;
 pub enum Error {
     /// Unsupported
     Unsupported(&'static str),
+    ///
+    Lock(&'static str),
     /// wallet related error
     Wallet(bitcoin_wallet::error::Error),
     /// IO error
@@ -42,6 +44,7 @@ impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::Unsupported(ref s) => s,
+            Error::Lock(ref s) => s,
             Error::Wallet(ref err) => err.description(),
             Error::IO(ref err) => err.description(),
             Error::DB(ref err) => err.description(),
@@ -53,6 +56,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             Error::Unsupported(_) => None,
+            Error::Lock(_) => None,
             Error::Wallet(ref err) => Some(err),
             Error::IO(ref err) => Some(err),
             Error::DB(ref err) => Some(err),
@@ -67,6 +71,7 @@ impl fmt::Display for Error {
         match *self {
             // underlying errors already impl `Display`, so we defer to their implementations.
             Error::Unsupported(ref s) => write!(f, "Unsupported: {}", s),
+            Error::Lock(ref s) => write!(f, "ReadLock: {}", s),
             Error::Wallet(ref s) => write!(f, "{}", s),
             Error::IO(ref s) => write!(f, "{}", s),
             Error::DB(ref s) => write!(f, "{}", s),

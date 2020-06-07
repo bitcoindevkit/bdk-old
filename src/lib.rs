@@ -27,9 +27,11 @@ pub mod blockdownload;
 pub mod config;
 pub mod db;
 pub mod error;
-pub mod jni;
 pub mod p2p_bitcoin;
 pub mod sendtx;
 pub mod store;
 pub mod trunk;
 pub mod wallet;
+
+#[cfg(feature = "android")]
+pub mod jni;
