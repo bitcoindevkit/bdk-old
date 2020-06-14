@@ -467,8 +467,6 @@ checksum = "d36fab90f82edc3c747f9d438e06cf0a491055896f2a279638bb5beed6c40177"
 [[package]]
 name = "hammersbald"
 version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba56eabb107827e7365630fbbf38a3928d2422cb305a2ca0acd4bdc34f5fd98e"
 dependencies = [
  "bitcoin",
  "bitcoin_hashes",
@@ -638,8 +636,6 @@ dependencies = [
 [[package]]
 name = "murmel"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "552ba26759a7ebcea4a728daf1f5c182789b8d4474b4fdaaa8f8a6cc5df351c0"
 dependencies = [
  "bitcoin",
  "bitcoin_hashes",

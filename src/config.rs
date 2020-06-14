@@ -15,13 +15,12 @@
  * limitations under the License.
  */
 
-use std::{fs, io};
+use std::fs;
 use std::fs::File;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::path::Path;
 use crate::error::Error;
-use crate::error::Error::TomlDe;
 
 use bitcoin::Network;
 

@@ -34,10 +34,19 @@ use crate::config::Config;
 // public API
 
 // void org.bdk.jni.BdkLib.initLogger()
+
 #[no_mangle]
+#[cfg(feature = "android")]
 pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(env: JNIEnv, _: JObject) {
     android_log::init("BDK").unwrap();
     info!("android logger initialized");
+}
+
+#[no_mangle]
+#[cfg(feature = "java")]
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(env: JNIEnv, _: JObject) {
+    // TODO init java logger
+    info!("java logger initialized");
 }
 
 // Optional<Config> org.bdk.jni.BdkLib.loadConfig(String workDir, int network)

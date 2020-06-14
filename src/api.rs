@@ -15,33 +15,30 @@
  * limitations under the License.
  */
 
-use std::{fs, thread, io, time};
+use std::{fs, time};
 use std::net::SocketAddr;
-use std::path::{PathBuf, Path};
-use std::sync::{Arc, Mutex, RwLock, PoisonError, RwLockWriteGuard, RwLockReadGuard};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, RwLock};
 
-use bitcoin::{BitcoinHash, Network, Address};
+use bitcoin::{Address, BitcoinHash, Network};
 use bitcoin::hashes::core::str::FromStr;
 use bitcoin::util::bip32::ExtendedPubKey;
+use bitcoin_hashes::sha256d;
 use bitcoin_wallet::account::MasterAccount;
-use futures::{executor::ThreadPoolBuilder, future, TryFutureExt};
+use futures::{executor::ThreadPoolBuilder};
+use futures_timer::Delay;
+use log::{info, warn};
 use murmel::chaindb::ChainDB;
+use once_cell::sync::Lazy;
 
+use crate::{config, db};
 use crate::config::Config;
+use crate::db::DB;
 use crate::error::Error;
-use crate::wallet::{KEY_LOOK_AHEAD, Wallet};
 use crate::p2p_bitcoin::{ChainDBTrunk, P2PBitcoin};
 use crate::store::{ContentStore, SharedContentStore};
-use crate::db::DB;
 use crate::trunk::Trunk;
-use crate::{config, db, store};
-use once_cell::sync::Lazy;
-use log::{info, warn};
-use futures_timer::Delay;
-use std::thread::spawn;
-use std::time::Duration;
-use bitcoin_hashes::sha256d;
-use crate::error::Error::Lock;
+use crate::wallet::{KEY_LOOK_AHEAD, Wallet};
 
 const CONFIG_FILE_NAME: &str = "bdk.cfg";
 
@@ -136,7 +133,6 @@ pub fn init_config(work_dir: PathBuf, network: Network, passphrase: &str, pd_pas
 }
 
 pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Error> {
-
     let p2p_bitcoin;
     let content_store;
 
@@ -223,7 +219,7 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
                 *cs = Option::Some(content_store.clone());
 
                 p2p_bitcoin = P2PBitcoin::new(config.network, config.bitcoin_connections, config.bitcoin_peers, config.bitcoin_discovery, chain_db.clone(), db.clone(),
-                                content_store.clone(), config.birth);
+                                              content_store.clone(), config.birth);
             }
         }
     }
@@ -235,7 +231,8 @@ pub fn start(work_dir: PathBuf, network: Network, rescan: bool) -> Result<(), Er
     {
         let mut cs = CONTENT_STORE.write().unwrap();
         *cs = Option::None;
-        debug!("content store set to None")
+        debug!("content store set to None");
+        p2p_bitcoin.shutdown()
     }
     Ok(())
 }
@@ -309,15 +306,17 @@ fn open_db(config_path: &Path) -> DB {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
-    use bitcoin::Network;
     use std::net::SocketAddr;
+    use std::path::PathBuf;
     use std::str::FromStr;
-    use env_logger::Env;
-    use log::info;
-    use crate::api::{init_config, update_config, remove_config, start, stop};
     use std::thread;
     use std::time::Duration;
+
+    use bitcoin::Network;
+    use env_logger::Env;
+    use log::info;
+
+    use crate::api::{init_config, remove_config, start, stop, update_config};
 
     const PASSPHRASE: &str = "correct horse battery staple";
     const PD_PASSPHRASE_1: &str = "test123";

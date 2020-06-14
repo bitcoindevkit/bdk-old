@@ -33,5 +33,5 @@ pub mod store;
 pub mod trunk;
 pub mod wallet;
 
-#[cfg(feature = "android")]
+#[cfg(any(feature = "java", feature = "android"))]
 pub mod jni;

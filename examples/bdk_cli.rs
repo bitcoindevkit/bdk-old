@@ -36,14 +36,14 @@ fn main() {
 
     let work_dir: PathBuf = PathBuf::from(".");
 
-    let inited = init_config(work_dir.clone(), Network::Regtest,
-                             PASSPHRASE, Some(PD_PASSPHRASE_1)).unwrap();
-    let peer1 = SocketAddr::from_str("127.0.0.1:9333").unwrap();
-    let peer2 = SocketAddr::from_str("127.0.0.1:19333").unwrap();
-
-    let updated = update_config(work_dir.clone(), Network::Regtest,
-                                vec!(peer1, peer2),
-                                2, false).unwrap();
+    // let inited = init_config(work_dir.clone(), Network::Testnet,
+    //                          PASSPHRASE, Some(PD_PASSPHRASE_1)).unwrap();
+    // let peer1 = SocketAddr::from_str("127.0.0.1:9333").unwrap();
+    // let peer2 = SocketAddr::from_str("127.0.0.1:19333").unwrap();
+    //
+    // let updated = update_config(work_dir.clone(), Network::Testnet,
+    //                             vec![peer1, peer2],
+    //                             2, false).unwrap();
 
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(1000));
@@ -51,31 +51,38 @@ fn main() {
         info!("balance: {:?}", balanceAmt);
 
         let deposit_addr = deposit_addr();
-        info!("deposit addr: {:?}", deposit_addr.address_type());
+        info!("deposit addr: {:?}, type: {:?}", deposit_addr, deposit_addr.address_type());
 
-        let withdrawTx = withdraw(PASSPHRASE.to_string(),
-                                Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
-                                10000, None);
-        match withdrawTx {
-            Ok(wtx) => info!("withdraw tx: {:?}", wtx),
-            Err(e) => error!("withdraw error: {:?}", e),
-        }
+        // let withdrawTx = withdraw(PASSPHRASE.to_string(),
+        //                         Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
+        //                         10000, None);
+        // match withdrawTx {
+        //     Ok(wtx) => info!("withdraw tx: {:?}", wtx),
+        //     Err(e) => error!("withdraw error: {:?}", e),
+        // }
+        //
+        // let balanceAmt = balance();
+        // info!("balance: {:?}", balanceAmt);
+        //
+        // thread::sleep(Duration::from_secs(30));
+        //
+        // let withdrawTx = withdraw(PASSPHRASE.to_string(),
+        //                         Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
+        //                         1, Some(1000000));
+        // match withdrawTx {
+        //     Ok(wtx) => info!("withdraw tx: {:?}", wtx),
+        //     Err(e) => error!("withdraw error: {:?}", e),
+        // }
+
+        thread::sleep(Duration::from_secs(240));
 
         let balanceAmt = balance();
         info!("balance: {:?}", balanceAmt);
-
-        let withdrawTx = withdraw(PASSPHRASE.to_string(),
-                                Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
-                                1, Some(1000000));
-        match withdrawTx {
-            Ok(wtx) => info!("withdraw tx: {:?}", wtx),
-            Err(e) => error!("withdraw error: {:?}", e),
-        }
 
         stop();
     });
 
     info!("Before start.");
 
-    start(work_dir.clone(), Network::Regtest, false);
+    start(work_dir.clone(), Network::Testnet, false);
 }

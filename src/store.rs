@@ -17,7 +17,6 @@
 
 //! store
 
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use bitcoin::{Address, BitcoinHash, Block, BlockHeader, PublicKey, Script, Transaction};
@@ -29,9 +28,7 @@ use bitcoin::{
     network::constants::Network,
 };
 use bitcoin::network::message::NetworkMessage;
-use bitcoin_hashes::{Hash, sha256, sha256d};
-use bitcoin_wallet::context::SecpContext;
-use bitcoin_wallet::proved::ProvedTransaction;
+use bitcoin_hashes::{sha256, sha256d};
 use murmel::p2p::{PeerMessage, PeerMessageSender};
 
 use crate::db::SharedDB;
@@ -39,13 +36,10 @@ use crate::error::Error;
 use crate::trunk::Trunk;
 use crate::wallet::Wallet;
 
-const MIN_SKETCH_SIZE: usize = 20;
-
 pub type SharedContentStore = Arc<RwLock<ContentStore>>;
 
 /// the distributed content storage
 pub struct ContentStore {
-    ctx: Arc<SecpContext>,
     trunk: Arc<dyn Trunk + Send + Sync>,
     db: SharedDB,
     wallet: Wallet,
@@ -57,7 +51,6 @@ impl ContentStore {
     /// new content store
     pub fn new(db: SharedDB, trunk: Arc<dyn Trunk + Send + Sync>, wallet: Wallet) -> Result<ContentStore, Error> {
         Ok(ContentStore {
-            ctx: Arc::new(SecpContext::new()),
             trunk,
             db,
             wallet,

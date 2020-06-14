@@ -73,7 +73,7 @@ const MAX_PROTOCOL_VERSION: u32 = 70001;
 pub struct P2PBitcoin {
     connections: usize,
     peers: Vec<SocketAddr>,
-    chaindb: SharedChainDB,
+    chain_db: SharedChainDB,
     network: Network,
     db: SharedDB,
     content_store: SharedContentStore,
@@ -82,8 +82,8 @@ pub struct P2PBitcoin {
 }
 
 impl P2PBitcoin {
-    pub fn new (network: Network, connections: usize, peers: Vec<SocketAddr>, discovery: bool, chaindb: SharedChainDB, db: SharedDB, content_store: SharedContentStore, birth: u64) -> P2PBitcoin {
-        P2PBitcoin {connections, peers, chaindb, network, db, content_store, discovery, birth}
+    pub fn new (network: Network, connections: usize, peers: Vec<SocketAddr>, discovery: bool, chain_db: SharedChainDB, db: SharedDB, content_store: SharedContentStore, birth: u64) -> P2PBitcoin {
+        P2PBitcoin {connections, peers, chain_db, network, db, content_store, discovery, birth}
     }
     pub fn start(&self, executor: &mut ThreadPool) {
         let (sender, receiver) = mpsc::sync_channel(100);
@@ -91,7 +91,7 @@ impl P2PBitcoin {
         let mut dispatcher = Dispatcher::new(receiver);
 
         let height =
-            if let Some(tip) = self.chaindb.read().unwrap().header_tip() {
+            if let Some(tip) = self.chain_db.read().unwrap().header_tip() {
                 AtomicUsize::new(tip.stored.height as usize)
             }
             else {
@@ -124,12 +124,12 @@ impl P2PBitcoin {
             let mut disconnected = Vec::new();
             {
                 // re-org might have happened while this node was down
-                let chaindb = self.chaindb.read().unwrap();
-                if let Some(mut header) = chaindb.get_header(&processed_block) {
-                    while chaindb.pos_on_trunk(&processed_block).is_none() {
+                let chain_db = self.chain_db.read().unwrap();
+                if let Some(mut header) = chain_db.get_header(&processed_block) {
+                    while chain_db.pos_on_trunk(&processed_block).is_none() {
                         disconnected.push(header.stored.header.clone());
                         processed_block = header.stored.header.prev_blockhash;
-                        header = chaindb.get_header(&processed_block).expect("inconsistent header cache");
+                        header = chain_db.get_header(&processed_block).expect("inconsistent header cache");
                     }
                 } else {
                     panic!("can not find header for last processed block");
@@ -148,7 +148,7 @@ impl P2PBitcoin {
         if self.discovery {
             dispatcher.add_listener(AddressPoolMaintainer::new(p2p_control.clone(), self.db.clone(), murmel::p2p::SERVICE_BLOCKS));
         }
-        dispatcher.add_listener(BlockDownload::new(self.chaindb.clone(), p2p_control.clone(), timeout.clone(), downstream, processed_block, self.birth));
+        dispatcher.add_listener(BlockDownload::new(self.chain_db.clone(), p2p_control.clone(), timeout.clone(), downstream, processed_block, self.birth));
         dispatcher.add_listener(Ping::new(p2p_control.clone(), timeout.clone()));
 
         let sendtx = SendTx::new(p2p_control.clone(), self.db.clone());
@@ -189,6 +189,10 @@ impl P2PBitcoin {
             p2p.poll_events("bitcoin", needed_services, &mut cex);
             Async::Ready(())
         })).expect("can not spawn bitcoin event loop");
+    }
+
+    pub fn shutdown(&self) {
+        self.chain_db.write().unwrap().shutdown()
     }
 }
 

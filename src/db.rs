@@ -22,7 +22,7 @@ use std::net::{Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use bitcoin::{Network, OutPoint, PublicKey, Script, TxOut};
 use bitcoin::consensus::{deserialize, serialize};
@@ -39,10 +39,7 @@ use rusqlite::{Connection, NO_PARAMS, OptionalExtension, ToSql, Transaction};
 use rusqlite::types::{Null, ValueRef};
 use siphasher::sip::SipHasher;
 
-use error;
-
 use crate::error::Error;
-use crate::wallet::Wallet;
 
 pub type SharedDB = Arc<Mutex<DB>>;
 
