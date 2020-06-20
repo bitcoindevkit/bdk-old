@@ -6,11 +6,13 @@ bitcoin network.
 
 ## Setup and Build
 
+1. [Install rustup](https://www.rust-lang.org/learn/get-started)
+
 1. Install rust targets (if not already installed)
    
    Android: 
       ```
-      rustup target add x86_64-linux-android aarch64-linux-android armv7-linux-androideabi i686-linux-android
+      rustup target add x86_64-apple-darwin x86_64-unknown-linux-gnu x86_64-linux-android aarch64-linux-android armv7-linux-androideabi i686-linux-android
       ```
       
       iOS:
@@ -18,7 +20,7 @@ bitcoin network.
       rustup target add aarch64-apple-ios armv7-apple-ios armv7s-apple-ios x86_64-apple-ios i386-apple-ios
       ```
    
-3. Install [cargo-ndk](https://docs.rs/crate/cargo-ndk/0.6.1) cargo extension:
+1. Install [cargo-ndk](https://docs.rs/crate/cargo-ndk/0.6.1) cargo extension:
    
    Android:
    ```
@@ -31,16 +33,28 @@ bitcoin network.
    cargo install cbindgen
    ```
 
+1. Install Android Studio and NDK
+ 
+   Open Android Studio -> SDK Manager  
+   Select SDK Tools tab
+   Install "NDK (Side by side)" 
+
 1. Set environment variables needed to build rust based library files and
    to run local unit tests. Better yet add these to your `.bash_profile`
 
-    Android:
+    Android (OSX):
     ```
     export ANDROID_HOME=$HOME/Library/Android
     export ANDROID_NDK_HOME=$ANDROID_HOME/sdk/ndk/<ndk version, eg. 21.0.6113669>
     ```
+   
+    Android (Linux):
+    ```
+    export ANDROID_HOME=$HOME/Android
+    export ANDROID_NDK_HOME=$ANDROID_HOME/Sdk/ndk/<ndk version, eg. 21.0.6113669>
+    ```
 
-    iOS:
+    iOS (OSX):
     ```
     ## if this fails:
     xcrun -k --sdk iphoneos --show-sdk-path
@@ -50,12 +64,22 @@ bitcoin network.
 
 1. Set environment variables needed to build Bitcoin C++ library files. This will be unnecessary after [fix](https://github.com/bbqsrc/cargo-ndk/pull/7) to [cargo-ndk](https://docs.rs/crate/cargo-ndk/0.6.1).
 
-    ```
-    export CXX_x86_64_linux_android=$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android28-clang++
-    export CXX_aarch64_linux_android=$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++
-    export CXX_armv7_linux_androideabi=$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi28-clang++
-    export CXX_i686_linux_android=$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android28-clang++
-    ```
+   Android (OSX) 
+   ```
+   export CXX_x86_64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android30-clang++
+   export CXX_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android30-clang++
+   export CXX_armv7_linux_androideabi=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi30-clang++
+   export CXX_i686_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android30-clang++
+   ```
+   
+   Android (Linux)
+   ```
+   export CXX_x86_64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android30-clang++
+   export CXX_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang++
+   export CXX_armv7_linux_androideabi=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi30-clang++
+   export CXX_i686_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android30-clang++
+   ```
+   
 
 1. Build Rust library files for all target platform OS architectures:
     

@@ -22,13 +22,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
 
-use bitcoin::{Network, Address};
+use bitcoin::{Address, Network};
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jlong, jobject, jobjectArray};
 use log::{error, info, warn};
 
-use crate::api::{balance, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config, withdraw, WithdrawTx, BalanceAmt};
+use crate::api::{balance, BalanceAmt, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config, withdraw, WithdrawTx};
 use crate::config::Config;
 
 // public API
@@ -37,15 +37,15 @@ use crate::config::Config;
 
 #[no_mangle]
 #[cfg(feature = "android")]
-pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(env: JNIEnv, _: JObject) {
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(_: JNIEnv, _: JObject) {
     android_log::init("BDK").unwrap();
     info!("android logger initialized");
 }
 
 #[no_mangle]
 #[cfg(feature = "java")]
-pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(env: JNIEnv, _: JObject) {
-    // TODO init java logger
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_initLogger(_: JNIEnv, _: JObject) {
+    env_logger::init();
     info!("java logger initialized");
 }
 
@@ -109,7 +109,6 @@ pub unsafe extern fn Java_org_bdk_jni_BdkLib_updateConfig(env: JNIEnv, _: JObjec
         let bitcoin_peer_addr = SocketAddr::from_str(bitcoin_peer)
             .expect("error SocketAddr::from_str(bitcoin_peer)");
 
-        let index = usize::try_from(i).expect("usize::try_from(bitcoin_peers_length");
         bitcoin_peers.push(bitcoin_peer_addr);
     }
 
@@ -176,7 +175,7 @@ pub unsafe extern fn Java_org_bdk_jni_BdkLib_start(env: JNIEnv, _: JObject, j_wo
 
 // void org.bdk.jni.BdkLib.stop()
 #[no_mangle]
-pub unsafe extern fn Java_org_bdk_jni_BdkLib_stop(env: JNIEnv, _: JObject) {
+pub unsafe extern fn Java_org_bdk_jni_BdkLib_stop(_: JNIEnv, _: JObject) {
     stop()
 }
 

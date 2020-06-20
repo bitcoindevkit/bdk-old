@@ -241,7 +241,7 @@ async fn check_stopped(store: Arc<RwLock<ContentStore>>) -> () {
     info!("start check_stopped");
     let mut stopped = false;
     while !stopped {
-        Delay::new(time::Duration::from_millis(100)).await;
+        Delay::new(time::Duration::from_millis(100)).await.unwrap();
         stopped = store.read().unwrap().get_stopped();
     }
     warn!("stopped");
