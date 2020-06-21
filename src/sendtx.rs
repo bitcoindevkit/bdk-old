@@ -14,19 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use murmel::p2p::{P2PControlSender, PeerMessageSender, PeerMessage, PeerMessageReceiver};
-use bitcoin::network::message::NetworkMessage;
-use bitcoin_hashes::sha256d;
-use crate::db::SharedDB;
 use std::{
-    thread,
-    sync::{mpsc},
     collections::HashMap,
-    time::{SystemTime}
+    sync::mpsc,
+    thread,
+    time::SystemTime
 };
+
+use bitcoin::network::message::NetworkMessage;
 use bitcoin::network::message_blockdata::{Inventory, InvType};
-use lru_cache::LruCache;
 use bitcoin::Transaction;
+use bitcoin_hashes::sha256d;
+use log::debug;
+use lru_cache::LruCache;
+use murmel::p2p::{P2PControlSender, PeerMessage, PeerMessageReceiver, PeerMessageSender};
+
+use crate::db::SharedDB;
 
 pub struct SendTx {
     p2p: P2PControlSender<NetworkMessage>,

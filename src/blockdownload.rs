@@ -14,24 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use bitcoin::{BitcoinHash, blockdata::{
-    block::BlockHeader,
-}, network::{
-    message::NetworkMessage,
-    message_blockdata::{GetHeadersMessage, Inventory, InvType},
-}, Block};
-use bitcoin_hashes::sha256d;
-use murmel::chaindb::SharedChainDB;
-use murmel::error::Error;
-use murmel::p2p::{P2PControl, P2PControlSender, PeerId, PeerMessage, PeerMessageReceiver, PeerMessageSender, SERVICE_BLOCKS};
-use murmel::timeout::{ExpectedReply, SharedTimeout};
-use murmel::downstream::SharedDownstream;
 use std::{
     collections::VecDeque,
     sync::mpsc,
     thread,
     time::Duration,
 };
+
+use bitcoin::{BitcoinHash, Block, blockdata::{
+    block::BlockHeader,
+}, network::{
+    message::NetworkMessage,
+    message_blockdata::{GetHeadersMessage, Inventory, InvType},
+}};
+use bitcoin_hashes::sha256d;
+use log::{debug, info, trace};
+use murmel::chaindb::SharedChainDB;
+use murmel::downstream::SharedDownstream;
+use murmel::error::Error;
+use murmel::p2p::{P2PControl, P2PControlSender, PeerId, PeerMessage, PeerMessageReceiver, PeerMessageSender, SERVICE_BLOCKS};
+use murmel::timeout::{ExpectedReply, SharedTimeout};
 
 pub struct BlockDownload {
     p2p: P2PControlSender<NetworkMessage>,

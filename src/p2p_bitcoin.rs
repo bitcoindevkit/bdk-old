@@ -18,55 +18,56 @@
 use std::{
     collections::HashSet,
     net::SocketAddr,
-    time::SystemTime,
+    sync::{Arc, atomic::AtomicUsize, mpsc, Mutex},
     thread,
-    sync::{Arc, Mutex, mpsc, atomic::AtomicUsize}
+    time::SystemTime
 };
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::time::Duration;
+
 use bitcoin::{
     Block, BlockHeader,
     network::{
         constants::Network,
         message::{
-            RawNetworkMessage,
             NetworkMessage,
+            RawNetworkMessage,
         }
     }
 };
 use bitcoin_hashes::sha256d;
 use futures::{
-    executor::{ThreadPool},
+    executor::ThreadPool,
     future,
-    Poll as Async,
-    FutureExt, StreamExt,
-    task::{SpawnExt, Context},
-    Future
+    Future,
+    FutureExt, Poll as Async,
+    StreamExt,
+    task::{Context, SpawnExt}
 };
 use futures_timer::Interval;
+use log::debug;
 use murmel::{
-    dispatcher::Dispatcher,
-    p2p::P2P,
     chaindb::SharedChainDB,
+    dispatcher::Dispatcher,
     dns::dns_seed,
     downstream::Downstream,
-    ping::Ping,
     p2p::{
-        PeerMessageSender, PeerSource, P2PControlSender, PeerMessage, PeerMessageReceiver,
-        BitcoinP2PConfig
+        BitcoinP2PConfig, P2PControlSender, PeerMessage, PeerMessageReceiver, PeerMessageSender,
+        PeerSource
     },
+    p2p::P2P,
+    ping::Ping,
     timeout::Timeout
 };
+use murmel::p2p::PeerId;
 use rand::{RngCore, thread_rng};
 
-use crate::db::SharedDB;
-use crate::store::SharedContentStore;
-use murmel::p2p::PeerId;
-use std::collections::HashMap;
-use std::time::Duration;
-use crate::trunk::Trunk;
 use crate::blockdownload::BlockDownload;
+use crate::db::SharedDB;
 use crate::sendtx::SendTx;
-use std::pin::Pin;
-
+use crate::store::SharedContentStore;
+use crate::trunk::Trunk;
 
 const MAX_PROTOCOL_VERSION: u32 = 70001;
 

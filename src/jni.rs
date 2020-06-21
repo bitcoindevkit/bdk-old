@@ -26,7 +26,7 @@ use bitcoin::{Address, Network};
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jlong, jobject, jobjectArray};
-use log::{error, info, warn};
+use log::{error, info};
 
 use crate::api::{balance, BalanceAmt, deposit_addr, init_config, InitResult, load_config, remove_config, start, stop, update_config, withdraw, WithdrawTx};
 use crate::config::Config;

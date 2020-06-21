@@ -33,6 +33,7 @@ use bitcoin_wallet::account::{Account, AccountAddressType, KeyDerivation, Master
 use bitcoin_wallet::coins::{Coin, Coins};
 use bitcoin_wallet::proved::ProvedTransaction;
 use byteorder::{ByteOrder, LittleEndian};
+use log::debug;
 use rand::{Rng, RngCore, thread_rng};
 use rand_distr::Poisson;
 use rusqlite::{Connection, NO_PARAMS, OptionalExtension, ToSql, Transaction};

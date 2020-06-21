@@ -26,6 +26,7 @@ use bitcoin_wallet::account::{Account, AccountAddressType, MasterAccount, Unlock
 use bitcoin_wallet::coins::Coins;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use bitcoin_wallet::proved::ProvedTransaction;
+use log::{debug, error};
 use rand::{RngCore, thread_rng};
 
 use crate::error::Error;

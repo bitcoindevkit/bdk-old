@@ -28,6 +28,7 @@ use bitcoin_wallet::account::MasterAccount;
 use futures::{executor::ThreadPoolBuilder};
 use futures_timer::Delay;
 use log::{info, warn};
+use log::{debug, error};
 use murmel::chaindb::ChainDB;
 use once_cell::sync::Lazy;
 

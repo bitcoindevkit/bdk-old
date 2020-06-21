@@ -29,6 +29,7 @@ use bitcoin::{
 };
 use bitcoin::network::message::NetworkMessage;
 use bitcoin_hashes::{sha256, sha256d};
+use log::{debug, info};
 use murmel::p2p::{PeerMessage, PeerMessageSender};
 
 use crate::db::SharedDB;
