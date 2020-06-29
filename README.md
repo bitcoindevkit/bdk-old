@@ -8,6 +8,12 @@ bitcoin network.
 
 1. [Install rustup](https://www.rust-lang.org/learn/get-started)
 
+1. Clone [bitcoindevkit/murmel](https://github.com/bitcoindevkit/murmel) to directory `../murmel` relative to the 
+`./bdk` project repo.
+
+   This is a temporary step until required updates to murmel can be pulled into to the main 
+   [rust-bitcoin/murmel](https://github.com/rust-bitcoin/murmel) repository. 
+
 1. Install rust targets (if not already installed)
    
    Android: 
