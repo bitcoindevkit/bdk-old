@@ -29,7 +29,7 @@ futures-timer = "0.3"
 hex="0.3"
 log="0.4"
 lru-cache = "0.1.2"
-murmel= {path="../murmel"}
+murmel= {git="https://github.com/bitcoindevkit/murmel.git"}
 once_cell = "1.3"
 rand = "0.7"
 rand_distr = "0.2"
