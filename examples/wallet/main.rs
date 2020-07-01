@@ -15,40 +15,39 @@
  * limitations under the License.
  */
 extern crate bdk;
-
 #[macro_use]
 extern crate clap;
 
-mod app;
-
-use env_logger::Env;
-use std::path::PathBuf;
-use bitcoin::{Network, Address};
-use std::net::{SocketAddr, AddrParseError};
+use std::cmp::max;
+use std::convert::TryFrom;
+use std::net::{AddrParseError, SocketAddr};
+use std::path::{PathBuf, Path};
 use std::str::FromStr;
-use log::{debug, info, warn, error};
-use bdk::api::{init_config, update_config, start, balance, deposit_addr, withdraw, stop};
 use std::thread;
-use bdk::api;
+
+use bitcoin::{Address, Network};
 use bitcoin_hashes::core::time::Duration;
-
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
-
 use clap::App;
+use futures::StreamExt;
+use log::{debug, error, info, warn, LevelFilter};
+use rustyline::Editor;
+use rustyline::error::ReadlineError;
+
+use bdk::api::{balance, deposit_addr, init_config, start, stop, update_config, withdraw};
+use bdk::api;
 use bdk::config::Config;
 use bdk::error::Error;
-use futures::StreamExt;
-use std::convert::TryFrom;
-use std::cmp::max;
+use std::process::ChildStderr;
+use chrono::Local;
+
+mod ui;
 
 const PASSPHRASE: &str = "correct horse battery staple";
 const PD_PASSPHRASE_1: &str = "test123";
 
 fn main() -> Result<(), Error> {
-    let cli = app::cli().get_matches();
-    let logging = cli.value_of("logging").unwrap_or("info");
-    env_logger::from_env(Env::default().default_filter_or(logging)).init();
+    let cli = ui::cli().get_matches();
+    let log_level = cli.value_of("logging").unwrap_or("info");
 
     let connections = cli.value_of("connections").map(|c| c.parse::<usize>().unwrap()).unwrap_or(5);
     let directory = cli.value_of("directory").unwrap_or(".");
@@ -58,6 +57,14 @@ fn main() -> Result<(), Error> {
     let peers = cli.values_of("peers").map(|a| a.collect::<Vec<&str>>()).unwrap_or(Vec::new());
 
     let work_dir: PathBuf = PathBuf::from(directory);
+    let mut log_file = work_dir.clone();
+    log_file.push(network);
+    log_file.push("wallet.log");
+    let log_file = log_file.as_path();
+    let log_level = LevelFilter::from_str(log_level).unwrap();
+
+    setup_logger(log_file, log_level);
+
     let mut history_file = work_dir.clone();
     history_file.push(network);
     history_file.push("history.txt");
@@ -66,24 +73,24 @@ fn main() -> Result<(), Error> {
 
     let network = network.parse::<Network>().unwrap();
 
-    info!("logging level: {}", logging);
-    info!("working directory: {:?}", work_dir);
-    info!("discovery: {:?}", discovery);
-    info!("network: {}", network);
-    info!("peers: {:?}", peers);
+    println!("logging level: {}", log_level);
+    println!("working directory: {:?}", work_dir);
+    println!("discovery: {:?}", discovery);
+    println!("network: {}", network);
+    println!("peers: {:?}", peers);
 
     let init_result = api::init_config(work_dir.clone(), network, password, None);
 
     match init_result {
         Ok(Some(init_result)) => {
-            warn!("created new wallet, seed words: {}", init_result.mnemonic_words);
-            info!("first deposit address: {}", init_result.deposit_address);
+            println!("created new wallet, seed words: {}", init_result.mnemonic_words);
+            println!("first deposit address: {}", init_result.deposit_address);
         }
         Ok(None) => {
-            info!("wallet exists");
+            println!("wallet exists");
         }
         Err(e) => {
-            error!("config error: {:?}", e);
+            println!("config error: {:?}", e);
         }
     };
 
@@ -93,7 +100,7 @@ fn main() -> Result<(), Error> {
 
     let connections = max(peers.len(), connections);
 
-    info!("peer connections: {}", connections);
+    println!("peer connections: {}", connections);
 
     let config = api::update_config(work_dir.clone(), network, peers, connections, discovery).unwrap();
     debug!("config: {:?}", config);
@@ -101,11 +108,11 @@ fn main() -> Result<(), Error> {
     let mut rl = Editor::<()>::new();
 
     if rl.load_history(history_file).is_err() {
-        info!("No previous history.");
+        println!("No previous history.");
     }
 
     let p2p_thread = thread::spawn(move || {
-        info!("starting p2p thread");
+        println!("starting p2p thread");
         api::start(work_dir.clone(), network, false);
     });
 
@@ -113,75 +120,78 @@ fn main() -> Result<(), Error> {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
-                rl.add_history_entry(line.as_str());
-                info!("Line: {}", line);
+                let split_line = line.split(' ');
+                let repl_matches = ui::repl().get_matches_from_safe(split_line);
+                if repl_matches.is_ok() {
+                    if let (c, Some(a)) = repl_matches.unwrap().subcommand() {
+                        debug!("command: {}, args: {:?}", c, a);
+                        rl.add_history_entry(line.as_str());
+                        match c {
+                            "stop" => {
+                                break;
+                            }
+                            "balance" => {
+                                let balance_amt = api::balance().unwrap();
+                                println!("balance: {}, confirmed: {}", balance_amt.balance, balance_amt.confirmed);
+                            }
+                            "deposit" => {
+                               let deposit_addr = api::deposit_addr();
+                                println!("deposit address: {}", deposit_addr);
+                            }
+                            "withdraw" => {
+                                // passphrase: String, address: Address, fee_per_vbyte: u64, amount: Option<u64>
+                                let password = a.value_of("password").unwrap().to_string();
+                                let address = Address::from_str(a.value_of("address").unwrap()).unwrap();
+                                let fee = a.value_of("fee").unwrap().parse::<u64>().unwrap();
+                                let amount = Some(a.value_of("amount").unwrap().parse::<u64>().unwrap());
+                                let withdraw_tx = api::withdraw(password, address, fee, amount).unwrap();
+                                println!("withdraw tx id: {}, fee: {}", withdraw_tx.txid, withdraw_tx.fee);
+                            }
+                            _ => {
+                                println!("command '{}' is not implemented", c);
+                            }
+                        }
+                    }
+                } else {
+                    let err = repl_matches.err().unwrap();
+                    println!("{}", err);
+                }
             }
             Err(ReadlineError::Interrupted) => {
-                info!("CTRL-C");
+                println!("CTRL-C");
                 break;
             }
             Err(ReadlineError::Eof) => {
-                info!("CTRL-D");
+                println!("CTRL-D");
                 break;
             }
             Err(err) => {
-                error!("Error: {:?}", err);
+                println!("Error: {:?}", err);
                 break;
             }
         }
     }
-    api::stop();
     rl.save_history(history_file).unwrap();
+    println!("stopping");
+    api::stop();
     p2p_thread.join().unwrap();
+    println!("stopped");
     Ok(())
+}
 
-    // let inited = init_config(work_dir.clone(), Network::Testnet,
-    //                          PASSPHRASE, Some(PD_PASSPHRASE_1)).unwrap();
-    // let peer1 = SocketAddr::from_str("127.0.0.1:9333").unwrap();
-    // let peer2 = SocketAddr::from_str("127.0.0.1:19333").unwrap();
-    //
-    // let updated = update_config(work_dir.clone(), Network::Testnet,
-    //                             vec![peer1, peer2],
-    //                             2, false).unwrap();
-
-    // thread::spawn(move || {
-    //     thread::sleep(Duration::from_millis(1000));
-    //     let balanceAmt = balance();
-    //     info!("balance: {:?}", balanceAmt);
-    //
-    //     let deposit_addr = deposit_addr();
-    //     info!("deposit addr: {:?}, type: {:?}", deposit_addr, deposit_addr.address_type());
-    //
-    //     // let withdrawTx = withdraw(PASSPHRASE.to_string(),
-    //     //                         Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
-    //     //                         10000, None);
-    //     // match withdrawTx {
-    //     //     Ok(wtx) => info!("withdraw tx: {:?}", wtx),
-    //     //     Err(e) => error!("withdraw error: {:?}", e),
-    //     // }
-    //     //
-    //     // let balanceAmt = balance();
-    //     // info!("balance: {:?}", balanceAmt);
-    //     //
-    //     // thread::sleep(Duration::from_secs(30));
-    //     //
-    //     // let withdrawTx = withdraw(PASSPHRASE.to_string(),
-    //     //                         Address::from_str("bcrt1q9dugqfjn3p3rrcvdw68zh790pd8g4vm3hmam09").unwrap(),
-    //     //                         1, Some(1000000));
-    //     // match withdrawTx {
-    //     //     Ok(wtx) => info!("withdraw tx: {:?}", wtx),
-    //     //     Err(e) => error!("withdraw error: {:?}", e),
-    //     // }
-    //
-    //     thread::sleep(Duration::from_secs(240));
-    //
-    //     let balanceAmt = balance();
-    //     info!("balance: {:?}", balanceAmt);
-    //
-    //     stop();
-    // });
-    //
-    // info!("Before start.");
-    //
-    // start(work_dir.clone(), Network::Testnet, false);
+fn setup_logger(file: &Path, level: LevelFilter) -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(level)
+        .chain(fern::log_file(file)?)
+        .apply()?;
+    Ok(())
 }

@@ -122,9 +122,11 @@ dependencies = [
  "bitcoin-wallet",
  "bitcoin_hashes",
  "byteorder",
+ "chrono",
  "clap",
  "dirs 2.0.2",
  "env_logger",
+ "fern",
  "futures-preview",
  "futures-timer",
  "hex",
@@ -388,6 +390,15 @@ name = "fallible-streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
+
+[[package]]
+name = "fern"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c9a4820f0ccc8a7afd67c39a0f1a0f4b07ca1725164271a64939d7aeb9af065"
+dependencies = [
+ "log 0.4.8",
+]
 
 [[package]]
 name = "fuchsia-cprng"
