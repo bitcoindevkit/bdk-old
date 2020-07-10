@@ -315,7 +315,7 @@ mod test {
 
     use bitcoin::Network;
     use env_logger::Env;
-    use log::info;
+    use log::{info, debug};
 
     use crate::api::{init_config, remove_config, start, stop, update_config};
 
