@@ -134,5 +134,5 @@ This will start the following interfaces:
 
 #### Stop
 ```
-$ nigiri stop
+$ nigiri stop --delete
 ```
