@@ -8,8 +8,15 @@ bitcoin network.
 
 1. [Install rustup](https://www.rust-lang.org/learn/get-started)
 
-1. Clone [bitcoindevkit/murmel](https://github.com/bitcoindevkit/murmel) to directory `../murmel` relative to the 
-`./bdk` project repo.
+2. Clone the directory using 
+   ```
+   git clone https://github.com/bitcoindevkit/bdk.git
+   ```
+
+1. Clone bitcoindevkit/murmel using
+   ```
+   git clone https://github.com/bitcoindevkit/murmel.git
+   ```
 
    This is a temporary step until required updates to murmel can be pulled into to the main 
    [rust-bitcoin/murmel](https://github.com/rust-bitcoin/murmel) repository. 
@@ -41,9 +48,7 @@ bitcoin network.
 
 1. Install Android Studio and NDK
  
-   Open Android Studio -> SDK Manager  
-   Select SDK Tools tab
-   Install "NDK (Side by side)" 
+   Open Android Studio -> Tools -> SDK Manager -> SDK Tools -> install "NDK (Side by side)"
 
 1. Set environment variables needed to build rust based library files and
    to run local unit tests. Better yet add these to your `.bash_profile`
@@ -90,7 +95,14 @@ bitcoin network.
 1. Build Rust library files for all target platform OS architectures:
     
    ```
+   cd bdk
    ./build-lib.sh
+   ```
+1. Check if all the tests are passing
+    
+   ```
+   cargo test --features android
+   cargo test --features java
    ```
    
 ## REGTEST Testing
@@ -98,3 +110,5 @@ bitcoin network.
 1. Clone [bitcoin-regtest-box project](https://github.com/bitcoindevkit/bitcoin-regtest-box) and follow
    [README.md](https://github.com/bitcoindevkit/bitcoin-regtest-box/blob/master/README.md) instructions to start 
    localhost REGTEST bitcoind nodes.
+   
+   Note: regtest-box only checks against bitcoin-core for now. The same will be updated later for bdk.
