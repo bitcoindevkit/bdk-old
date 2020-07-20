@@ -1,18 +1,12 @@
 Bitcoin Development Kit
 =======================
 
-This library combines rust-bitcoin and rust-wallet libraries to provide basic functionality for interacting with the 
-bitcoin network.
+This library combines rust-bitcoin, murmel, and rust-wallet libraries to provide basic functionality for interacting with the 
+bitcoin network. The library can be used in an android mobile app by including the optional jni module.
 
 ## Setup and Build
 
 1. [Install rustup](https://www.rust-lang.org/learn/get-started)
-
-1. Clone [bitcoindevkit/murmel](https://github.com/bitcoindevkit/murmel) to directory `../murmel` relative to the 
-`./bdk` project repo.
-
-   This is a temporary step until required updates to murmel can be pulled into to the main 
-   [rust-bitcoin/murmel](https://github.com/rust-bitcoin/murmel) repository. 
 
 1. Install rust targets (if not already installed)
    
@@ -41,9 +35,7 @@ bitcoin network.
 
 1. Install Android Studio and NDK
  
-   Open Android Studio -> SDK Manager  
-   Select SDK Tools tab
-   Install "NDK (Side by side)" 
+   Open Android Studio -> Tools -> SDK Manager -> SDK Tools -> install "NDK (Side by side)"
 
 1. Set environment variables needed to build rust based library files and
    to run local unit tests. Better yet add these to your `.bash_profile`
