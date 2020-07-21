@@ -29,7 +29,7 @@ futures-timer = "0.3"
 hex="0.3"
 log="0.4"
 lru-cache = "0.1.2"
-murmel= {path="../murmel"}
+murmel = { git = "https://github.com/rust-bitcoin/murmel" }
 once_cell = "1.3"
 rand = "0.7"
 rand_distr = "0.2"
@@ -50,7 +50,8 @@ jni = { version = "0.13.1", optional = true }
 lto = true
 
 [dev-dependencies]
-rustyline = "6.2.0"
-fern = "0.6"
 chrono = "0.4"
 clap = "2"
+env_logger = "0.7"
+fern = "0.6"
+rustyline = "6.2.0"

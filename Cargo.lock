@@ -715,6 +715,7 @@ dependencies = [
 [[package]]
 name = "murmel"
 version = "0.2.1"
+source = "git+https://github.com/rust-bitcoin/murmel#ac2f469b3c2c86f12650e8564cf468c93df86226"
 dependencies = [
  "bitcoin",
  "bitcoin_hashes",

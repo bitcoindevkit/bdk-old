@@ -1,8 +1,8 @@
 Bitcoin Development Kit
 =======================
 
-This library combines rust-bitcoin and rust-wallet libraries to provide basic functionality for interacting with the 
-bitcoin network.
+This library combines rust-bitcoin, murmel, and rust-wallet libraries to provide basic functionality for interacting with the 
+bitcoin network. The library can be used in an android mobile app by including the optional jni module.
 
 ## Setup and Build
 
