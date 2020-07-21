@@ -111,4 +111,5 @@ bitcoin network. The library can be used in an android mobile app by including t
    [README.md](https://github.com/bitcoindevkit/bitcoin-regtest-box/blob/master/README.md) instructions to start 
    localhost REGTEST bitcoind nodes.
    
-   Note: regtest-box only checks against bitcoin-core for now. The same will be updated later for bdk.
+   Note: regtest-box spawns 2 bitcoin core nodes in regtest mode in a docker container. This can be used to effectively perform functional testing for bdk. More
+   detail regarding this will be updated later.
