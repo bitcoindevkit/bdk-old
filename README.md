@@ -95,14 +95,7 @@ bitcoin network.
    
 ## REGTEST Testing
 
-Install Docker on your machine and use one of the following methods (either `bitcoin-regtest-box` or `nigiri`)
-
-### Bitcoin Regtest Box
-
-Clone [bitcoin-regtest-box project](https://github.com/bitcoindevkit/bitcoin-regtest-box) and follow
-   [README.md](https://github.com/bitcoindevkit/bitcoin-regtest-box/blob/master/README.md) instructions to start 
-   localhost REGTEST bitcoind nodes.
-
+Install Docker and Docker Compose on your machine
 
 ### nigiri
 You can use 🍣 [Nigiri CLI](https://github.com/vulpemventures/nigiri) to spin-up a complete development environment in `regtest` that includes a `bitcoin` node, a Blockstream `electrs` explorer and the [`esplora`](https://github.com/blockstream/esplora) web-app to visualize blocks and transactions in the browser.
