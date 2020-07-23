@@ -87,37 +87,11 @@ bitcoin network. The library can be used in an android mobile app by including t
    
 ## REGTEST Testing
 
-Install Docker and Docker Compose on your machine
+The 🍣 [Nigiri CLI](https://github.com/vulpemventures/nigiri) tool can be used to spin-up a complete `regtest` 
+development environment that includes a `bitcoin` node, a Blockstream `electrs` explorer and the 
+[`esplora`](https://github.com/blockstream/esplora) web-app to visualize blocks and transactions in the browser.
 
-### nigiri
-You can use 🍣 [Nigiri CLI](https://github.com/vulpemventures/nigiri) to spin-up a complete development environment in `regtest` that includes a `bitcoin` node, a Blockstream `electrs` explorer and the [`esplora`](https://github.com/blockstream/esplora) web-app to visualize blocks and transactions in the browser.
+First install [Docker-Desktop](https://www.docker.com/products/docker-desktop) on your machine. Then see the 
+[Nigiri CLI README.md](https://github.com/vulpemventures/nigiri/blob/master/README.md) file to install via prebuilt binaries or from the 
+ project source.
 
-#### Install 🍣 Nigiri
-```bash
-$ curl https://getnigiri.vulpem.com | bash
-```
-
-#### Start
-```
-$ nigiri start
-```
-
-This will start the following interfaces:
-
-* Bitcoin 
-  * RPC host:port `localhost:18443`
-  * RPC user `admin1`
-  * RPC password `123`
-
-* Electrs
-  * REST `localhost:3000`
-  * Faucet `curl -X POST --data '{"address": "btcAddrs"}' http://localhost:3000/faucet`
-
-* Esplora
-  * From the browser `http://localhost:5000`
-
-
-#### Stop
-```
-$ nigiri stop --delete
-```
