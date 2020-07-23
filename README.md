@@ -107,9 +107,39 @@ bitcoin network. The library can be used in an android mobile app by including t
    
 ## REGTEST Testing
 
-1. Clone [bitcoin-regtest-box project](https://github.com/bitcoindevkit/bitcoin-regtest-box) and follow
-   [README.md](https://github.com/bitcoindevkit/bitcoin-regtest-box/blob/master/README.md) instructions to start 
-   localhost REGTEST bitcoind nodes.
-   
-   Note: regtest-box spawns 2 bitcoin core nodes in regtest mode in a docker container. This can be used to effectively perform functional testing for bdk. More
-   detail regarding this will be updated later.
+
+Install Docker and Docker Compose on your machine
+
+### nigiri
+You can use 🍣 [Nigiri CLI](https://github.com/vulpemventures/nigiri) to spin-up a complete development environment in `regtest` that includes a `bitcoin` node, a Blockstream `electrs` explorer and the [`esplora`](https://github.com/blockstream/esplora) web-app to visualize blocks and transactions in the browser.
+
+#### Install 🍣 Nigiri
+```bash
+$ curl https://getnigiri.vulpem.com | bash
+```
+
+#### Start
+```
+$ nigiri start
+```
+
+This will start the following interfaces:
+
+* Bitcoin 
+  * RPC host:port `localhost:18443`
+  * RPC user `admin1`
+  * RPC password `123`
+
+* Electrs
+  * REST `localhost:3000`
+  * Faucet `curl -X POST --data '{"address": "btcAddrs"}' http://localhost:3000/faucet`
+
+* Esplora
+  * From the browser `http://localhost:5000`
+
+
+#### Stop
+```
+$ nigiri stop --delete
+```
+
