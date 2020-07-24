@@ -8,7 +8,7 @@ bitcoin network. The library can be used in an android mobile app by including t
 
 1. [Install rustup](https://www.rust-lang.org/learn/get-started)
 
-2. Clone the directory using 
+1. Clone the directory using 
    ```
    git clone https://github.com/bitcoindevkit/bdk.git
    ```
