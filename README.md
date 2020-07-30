@@ -37,19 +37,19 @@ bitcoin network. The library can be used in an android mobile app by including t
  
    Open Android Studio -> Tools -> SDK Manager -> SDK Tools -> install "NDK (Side by side)"
 
-1. Set environment variables needed to build rust based library files and
-   to run local unit tests. Better yet add these to your `.bash_profile`
+1. If not already set, set environment variables needed to build rust based library files and
+   to run local unit tests. Better yet, add these to your `.bash_profile`.
 
     Android (OSX):
     ```
-    export ANDROID_HOME=$HOME/Library/Android
-    export ANDROID_NDK_HOME=$ANDROID_HOME/sdk/ndk/<ndk version, eg. 21.0.6113669>
+    export ANDROID_HOME=$HOME/Library/Android/sdk
+    export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<ndk version, eg. 21.0.6113669>
     ```
    
     Android (Linux):
     ```
-    export ANDROID_HOME=$HOME/Android
-    export ANDROID_NDK_HOME=$ANDROID_HOME/Sdk/ndk/<ndk version, eg. 21.0.6113669>
+    export ANDROID_HOME=$HOME/Android/Sdk
+    export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<ndk version, eg. 21.0.6113669>
     ```
 
     iOS (OSX):
