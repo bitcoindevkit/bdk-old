@@ -17,17 +17,17 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bitcoin::{Address, Block, PublicKey, Script, SigHashType, Transaction, TxIn, TxOut};
 use bitcoin::consensus::serialize;
 use bitcoin::network::constants::Network;
 use bitcoin::util::bip32::ExtendedPubKey;
+use bitcoin::{Address, Block, PublicKey, Script, SigHashType, Transaction, TxIn, TxOut};
 use bitcoin_hashes::{sha256, sha256d};
 use bitcoin_wallet::account::{Account, AccountAddressType, MasterAccount, Unlocker};
 use bitcoin_wallet::coins::Coins;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use bitcoin_wallet::proved::ProvedTransaction;
 use log::{debug, error};
-use rand::{RngCore, thread_rng};
+use rand::{thread_rng, RngCore};
 
 use crate::error::Error;
 use crate::trunk::Trunk;
@@ -76,7 +76,9 @@ impl Wallet {
     }
 
     pub fn available_balance<H>(&self, height: u32, height_for_block: H) -> u64
-        where H: Fn(&sha256d::Hash) -> Option<u32> {
+    where
+        H: Fn(&sha256d::Hash) -> Option<u32>,
+    {
         self.coins.available_balance(height, height_for_block)
     }
 
@@ -96,40 +98,74 @@ impl Wallet {
         self.coins.proofs().get(txid)
     }
 
-    pub fn fund<W>(&mut self, id: &sha256::Hash, mut term: u16, passpharse: String, mut fee_per_vbyte: u64, amount: u64, trunk: Arc<dyn Trunk>, scripter: W) -> Result<(Transaction, PublicKey, u64), Error>
-        where W: FnOnce(&PublicKey, Option<u16>) -> Script {
+    pub fn fund<W>(
+        &mut self,
+        id: &sha256::Hash,
+        mut term: u16,
+        passpharse: String,
+        mut fee_per_vbyte: u64,
+        amount: u64,
+        trunk: Arc<dyn Trunk>,
+        scripter: W,
+    ) -> Result<(Transaction, PublicKey, u64), Error>
+    where
+        W: FnOnce(&PublicKey, Option<u16>) -> Script,
+    {
         let network = self.master.master_public().network;
         let mut unlocker = Unlocker::new(
-            self.master.encrypted(), passpharse.as_str(),
-            network, Some(self.master.master_public()))?;
-        fee_per_vbyte = std::cmp::min(MAX_FEE_PER_VBYTE, std::cmp::max(MIN_FEE_PER_VBYTE, fee_per_vbyte));
+            self.master.encrypted(),
+            passpharse.as_str(),
+            network,
+            Some(self.master.master_public()),
+        )?;
+        fee_per_vbyte = std::cmp::min(
+            MAX_FEE_PER_VBYTE,
+            std::cmp::max(MIN_FEE_PER_VBYTE, fee_per_vbyte),
+        );
         term = std::cmp::min(MAX_TERM, term);
         let mut fee = 0;
-        let change_address = self.master.get_mut((0, 1)).unwrap().next_key().unwrap().address.clone();
+        let change_address = self
+            .master
+            .get_mut((0, 1))
+            .unwrap()
+            .next_key()
+            .unwrap()
+            .address
+            .clone();
         let height = trunk.len();
-        let coins = self.coins.choose_inputs(amount, height, |h| trunk.get_height(h));
+        let coins = self
+            .coins
+            .choose_inputs(amount, height, |h| trunk.get_height(h));
         let total_input = coins.iter().map(|(_, c, _)| c.output.value).sum::<u64>();
         let contract_address;
         let funder;
         {
             let commit_account = self.master.get_mut((1, 0)).unwrap();
-            let kix = commit_account.add_script_key(scripter, Some(&id[..]), Some(term)).expect("can not commit to ad");
+            let kix = commit_account
+                .add_script_key(scripter, Some(&id[..]), Some(term))
+                .expect("can not commit to ad");
             contract_address = commit_account.get_key(kix).unwrap().address.clone();
-            funder = commit_account.compute_base_public_key(kix).expect("can not compute base public key");
+            funder = commit_account
+                .compute_base_public_key(kix)
+                .expect("can not compute base public key");
         }
         if amount > total_input {
             return Err(Error::Unsupported("insufficient funds"));
         }
         let mut tx = Transaction {
-            input: coins.iter().map(|(point, coin, h)|
-                TxIn {
+            input: coins
+                .iter()
+                .map(|(point, coin, h)| TxIn {
                     previous_output: point.clone(),
                     script_sig: Script::new(),
                     sequence: if let Some(csv) = coin.derivation.csv {
                         std::cmp::min(csv as u32, height - *h)
-                    } else { RBF },
+                    } else {
+                        RBF
+                    },
                     witness: vec![],
-                }).collect(),
+                })
+                .collect(),
             output: Vec::new(),
             version: 2,
             lock_time: 0,
@@ -142,20 +178,36 @@ impl Wallet {
                     script_pubkey: contract_address.script_pubkey(),
                 });
             } else {
-                return Err(Error::Unsupported("withdraw amount is less than the fees needed (+DUST limit)"));
+                return Err(Error::Unsupported(
+                    "withdraw amount is less than the fees needed (+DUST limit)",
+                ));
             }
             if total_input > amount && (total_input - amount) > DUST {
-                tx.output.insert((thread_rng().next_u32() % 2) as usize, TxOut {
-                    value: total_input - amount,
-                    script_pubkey: change_address.script_pubkey(),
-                });
+                tx.output.insert(
+                    (thread_rng().next_u32() % 2) as usize,
+                    TxOut {
+                        value: total_input - amount,
+                        script_pubkey: change_address.script_pubkey(),
+                    },
+                );
             }
-            if self.master.sign(&mut tx, SigHashType::All,
-                                &|point| {
-                                    coins.iter().find(|(o, _, _)| *o == *point).map(|(_, c, _)| c.output.clone())
-                                }, &mut unlocker)?
-                != tx.input.len() {
-                error!("could not sign all inputs of our transaction {:?} {}", tx, hex::encode(serialize(&tx)));
+            if self.master.sign(
+                &mut tx,
+                SigHashType::All,
+                &|point| {
+                    coins
+                        .iter()
+                        .find(|(o, _, _)| *o == *point)
+                        .map(|(_, c, _)| c.output.clone())
+                },
+                &mut unlocker,
+            )? != tx.input.len()
+            {
+                error!(
+                    "could not sign all inputs of our transaction {:?} {}",
+                    tx,
+                    hex::encode(serialize(&tx))
+                );
                 return Err(Error::Unsupported("could not sign for all inputs"));
             }
             if fee == 0 {
@@ -163,48 +215,87 @@ impl Wallet {
             } else {
                 debug!("compiled transaction to withdraw {} fee {}", amount, fee);
                 #[cfg(feature = "bitcoinconsensus")]
-                    {
-                        match tx.verify(|o| coins.iter().find_map(|(p, c, _)| if *p == *o { Some(c.output.clone()) } else { None })) {
-                            Ok(()) => {}
-                            Err(e) => {
-                                error!("our transaction does not verify {:?} {}", tx, hex::encode(serialize(&tx)));
-                                return Err(Error::Script(e));
+                {
+                    match tx.verify(|o| {
+                        coins.iter().find_map(|(p, c, _)| {
+                            if *p == *o {
+                                Some(c.output.clone())
+                            } else {
+                                None
                             }
+                        })
+                    }) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            error!(
+                                "our transaction does not verify {:?} {}",
+                                tx,
+                                hex::encode(serialize(&tx))
+                            );
+                            return Err(Error::Script(e));
                         }
                     }
+                }
                 break;
             }
         }
-        self.coins.process_unconfirmed_transaction(&mut self.master, &tx);
+        self.coins
+            .process_unconfirmed_transaction(&mut self.master, &tx);
         Ok((tx, funder, fee))
     }
 
-    pub fn withdraw(&mut self, passphrase: String, address: Address, mut fee_per_vbyte: u64, amount: Option<u64>, trunk: Arc<dyn Trunk>) -> Result<(Transaction, u64), Error> {
+    pub fn withdraw(
+        &mut self,
+        passphrase: String,
+        address: Address,
+        mut fee_per_vbyte: u64,
+        amount: Option<u64>,
+        trunk: Arc<dyn Trunk>,
+    ) -> Result<(Transaction, u64), Error> {
         let network = self.master.master_public().network;
         let mut unlocker = Unlocker::new(
-            self.master.encrypted(), passphrase.as_str(),
-            network, Some(self.master.master_public()))?;
+            self.master.encrypted(),
+            passphrase.as_str(),
+            network,
+            Some(self.master.master_public()),
+        )?;
         let height = trunk.len();
         let balance = self.available_balance(height, |h| trunk.get_height(h));
         let amount = amount.unwrap_or(balance);
-        fee_per_vbyte = std::cmp::min(MAX_FEE_PER_VBYTE, std::cmp::max(MIN_FEE_PER_VBYTE, fee_per_vbyte));
+        fee_per_vbyte = std::cmp::min(
+            MAX_FEE_PER_VBYTE,
+            std::cmp::max(MIN_FEE_PER_VBYTE, fee_per_vbyte),
+        );
         let mut fee = 0;
-        let change_address = self.master.get_mut((0, 1)).unwrap().next_key().unwrap().address.clone();
-        let coins = self.coins.choose_inputs(amount, height, |h| trunk.get_height(h));
+        let change_address = self
+            .master
+            .get_mut((0, 1))
+            .unwrap()
+            .next_key()
+            .unwrap()
+            .address
+            .clone();
+        let coins = self
+            .coins
+            .choose_inputs(amount, height, |h| trunk.get_height(h));
         let total_input = coins.iter().map(|(_, c, _)| c.output.value).sum::<u64>();
         if amount > total_input {
             return Err(Error::Unsupported("insufficient funds"));
         }
         let mut tx = Transaction {
-            input: coins.iter().map(|(point, coin, h)|
-                TxIn {
+            input: coins
+                .iter()
+                .map(|(point, coin, h)| TxIn {
                     previous_output: point.clone(),
                     script_sig: Script::new(),
                     sequence: if let Some(csv) = coin.derivation.csv {
                         std::cmp::min(csv as u32, height - *h)
-                    } else { RBF },
+                    } else {
+                        RBF
+                    },
                     witness: vec![],
-                }).collect(),
+                })
+                .collect(),
             output: Vec::new(),
             version: 2,
             lock_time: 0,
@@ -217,20 +308,36 @@ impl Wallet {
                     script_pubkey: address.script_pubkey(),
                 });
             } else {
-                return Err(Error::Unsupported("withdraw amount is less than the fees needed (+DUST limit)"));
+                return Err(Error::Unsupported(
+                    "withdraw amount is less than the fees needed (+DUST limit)",
+                ));
             }
             if total_input > amount && (total_input - amount) > DUST {
-                tx.output.insert((thread_rng().next_u32() % 2) as usize, TxOut {
-                    value: total_input - amount,
-                    script_pubkey: change_address.script_pubkey(),
-                });
+                tx.output.insert(
+                    (thread_rng().next_u32() % 2) as usize,
+                    TxOut {
+                        value: total_input - amount,
+                        script_pubkey: change_address.script_pubkey(),
+                    },
+                );
             }
-            if self.master.sign(&mut tx, SigHashType::All,
-                                &|point| {
-                                    coins.iter().find(|(o, _, _)| *o == *point).map(|(_, c, _)| c.output.clone())
-                                }, &mut unlocker)?
-                != tx.input.len() {
-                error!("could not sign all inputs of our transaction {:?} {}", tx, hex::encode(serialize(&tx)));
+            if self.master.sign(
+                &mut tx,
+                SigHashType::All,
+                &|point| {
+                    coins
+                        .iter()
+                        .find(|(o, _, _)| *o == *point)
+                        .map(|(_, c, _)| c.output.clone())
+                },
+                &mut unlocker,
+            )? != tx.input.len()
+            {
+                error!(
+                    "could not sign all inputs of our transaction {:?} {}",
+                    tx,
+                    hex::encode(serialize(&tx))
+                );
                 return Err(Error::Unsupported("could not sign for all inputs"));
             }
             if fee == 0 {
@@ -238,79 +345,161 @@ impl Wallet {
             } else {
                 debug!("compiled transaction to withdraw {} fee {}", amount, fee);
                 #[cfg(feature = "bitcoinconsensus")]
-                    {
-                        match tx.verify(|o| coins.iter().find_map(|(p, c, _)| if *p == *o { Some(c.output.clone()) } else { None })) {
-                            Ok(()) => {}
-                            Err(e) => {
-                                error!("our transaction does not verify {:?} {}", tx, hex::encode(serialize(&tx)));
-                                return Err(Error::Script(e));
+                {
+                    match tx.verify(|o| {
+                        coins.iter().find_map(|(p, c, _)| {
+                            if *p == *o {
+                                Some(c.output.clone())
+                            } else {
+                                None
                             }
+                        })
+                    }) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            error!(
+                                "our transaction does not verify {:?} {}",
+                                tx,
+                                hex::encode(serialize(&tx))
+                            );
+                            return Err(Error::Script(e));
                         }
                     }
+                }
                 break;
             }
         }
-        self.coins.process_unconfirmed_transaction(&mut self.master, &tx);
+        self.coins
+            .process_unconfirmed_transaction(&mut self.master, &tx);
         Ok((tx, fee))
     }
 
     pub fn from_storage(coins: Coins, mut master: MasterAccount) -> Wallet {
         for (_, coin) in coins.confirmed() {
             let ref d = coin.derivation;
-            master.get_mut((d.account, d.sub)).unwrap().do_look_ahead(Some(d.kix)).expect("can not look ahead of storage");
+            master
+                .get_mut((d.account, d.sub))
+                .unwrap()
+                .do_look_ahead(Some(d.kix))
+                .expect("can not look ahead of storage");
         }
         for (_, coin) in coins.unconfirmed() {
             let ref d = coin.derivation;
-            master.get_mut((d.account, d.sub)).unwrap().do_look_ahead(Some(d.kix)).expect("can not look ahead of storage");
+            master
+                .get_mut((d.account, d.sub))
+                .unwrap()
+                .do_look_ahead(Some(d.kix))
+                .expect("can not look ahead of storage");
         }
-        Wallet { coins: coins, master }
+        Wallet {
+            coins: coins,
+            master,
+        }
     }
 
-    pub fn from_encrypted(encrypted: &[u8], public_master_key: ExtendedPubKey, birth: u64) -> Wallet {
+    pub fn from_encrypted(
+        encrypted: &[u8],
+        public_master_key: ExtendedPubKey,
+        birth: u64,
+    ) -> Wallet {
         let master = MasterAccount::from_encrypted(encrypted, public_master_key, birth);
-        Wallet { coins: Coins::new(), master }
+        Wallet {
+            coins: Coins::new(),
+            master,
+        }
     }
 
-    pub fn new(bitcoin_network: Network, passphrase: &str, pd_passphrase: Option<&str>) -> (Mnemonic, Address, Wallet) {
-        assert!(passphrase.len() >= 8, "Password should have at least 8 characters");
+    pub fn new(
+        bitcoin_network: Network,
+        passphrase: &str,
+        pd_passphrase: Option<&str>,
+    ) -> (Mnemonic, Address, Wallet) {
+        assert!(
+            passphrase.len() >= 8,
+            "Password should have at least 8 characters"
+        );
         let mut entropy = [0u8; 16];
         thread_rng().fill_bytes(&mut entropy);
         let mnemonic = Mnemonic::new(&entropy).expect("can not create mnemonic");
-        let mut master = MasterAccount::from_mnemonic(&mnemonic, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                                                      bitcoin_network, passphrase, pd_passphrase).expect("can not generate wallet");
-        let mut unlocker = Unlocker::new(master.encrypted().as_slice(),
-                                         passphrase, bitcoin_network,
-                                         Some(&master.master_public())).expect("Internal error in wallet generation");
-        let receiver = Account::new(&mut unlocker, AccountAddressType::P2SHWPKH, 0, 0, KEY_LOOK_AHEAD)
-            .expect("can not create receiver account");
+        let mut master = MasterAccount::from_mnemonic(
+            &mnemonic,
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            bitcoin_network,
+            passphrase,
+            pd_passphrase,
+        )
+        .expect("can not generate wallet");
+        let mut unlocker = Unlocker::new(
+            master.encrypted().as_slice(),
+            passphrase,
+            bitcoin_network,
+            Some(&master.master_public()),
+        )
+        .expect("Internal error in wallet generation");
+        let receiver = Account::new(
+            &mut unlocker,
+            AccountAddressType::P2SHWPKH,
+            0,
+            0,
+            KEY_LOOK_AHEAD,
+        )
+        .expect("can not create receiver account");
         master.add_account(receiver);
-        let change = Account::new(&mut unlocker, AccountAddressType::P2SHWPKH, 0, 1, KEY_LOOK_AHEAD)
-            .expect("can not create change account");
+        let change = Account::new(
+            &mut unlocker,
+            AccountAddressType::P2SHWPKH,
+            0,
+            1,
+            KEY_LOOK_AHEAD,
+        )
+        .expect("can not create change account");
         master.add_account(change);
-        let commitments = Account::new(&mut unlocker, AccountAddressType::P2WSH(KEY_PURPOSE), 1, 0, 0)
-            .expect("can not create commitments account");
+        let commitments = Account::new(
+            &mut unlocker,
+            AccountAddressType::P2WSH(KEY_PURPOSE),
+            1,
+            0,
+            0,
+        )
+        .expect("can not create commitments account");
         master.add_account(commitments);
-        let deposit_address = master.get((0, 0)).unwrap().get_key(0).unwrap().address.clone();
+        let deposit_address = master
+            .get((0, 0))
+            .unwrap()
+            .get_key(0)
+            .unwrap()
+            .address
+            .clone();
 
-        (mnemonic, deposit_address, Wallet {
-            master,
-            coins: Coins::new(),
-        })
+        (
+            mnemonic,
+            deposit_address,
+            Wallet {
+                master,
+                coins: Coins::new(),
+            },
+        )
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::time::{SystemTime, UNIX_EPOCH};
     use std::{
         str::FromStr,
         sync::{Arc, Mutex},
     };
-    use std::time::{SystemTime, UNIX_EPOCH};
 
-    use bitcoin::{Address, BitcoinHash, Block, blockdata::opcodes::all, BlockHeader, network::constants::Network, OutPoint, PublicKey, Transaction, TxIn, TxOut, util::bip32::ExtendedPubKey};
     use bitcoin::blockdata::constants::genesis_block;
     use bitcoin::blockdata::script::Builder;
     use bitcoin::util::hash::MerkleRoot;
+    use bitcoin::{
+        blockdata::opcodes::all, network::constants::Network, util::bip32::ExtendedPubKey, Address,
+        BitcoinHash, Block, BlockHeader, OutPoint, PublicKey, Transaction, TxIn, TxOut,
+    };
     use bitcoin_hashes::{sha256, sha256d};
     use bitcoin_wallet::account::{Account, AccountAddressType, Unlocker};
 
@@ -322,7 +511,7 @@ mod test {
     const PASSPHRASE: &str = "whatever";
 
     struct TestTrunk {
-        trunk: Arc<Mutex<Vec<BlockHeader>>>
+        trunk: Arc<Mutex<Vec<BlockHeader>>>,
     }
 
     impl TestTrunk {
@@ -333,19 +522,43 @@ mod test {
 
     impl Trunk for TestTrunk {
         fn is_on_trunk(&self, block_hash: &sha256d::Hash) -> bool {
-            self.trunk.lock().unwrap().iter().any(|h| h.bitcoin_hash() == *block_hash)
+            self.trunk
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|h| h.bitcoin_hash() == *block_hash)
         }
 
         fn get_header(&self, block_hash: &sha256d::Hash) -> Option<BlockHeader> {
-            self.trunk.lock().unwrap().iter().find(|h| h.bitcoin_hash() == *block_hash).map(|h| h.clone())
+            self.trunk
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|h| h.bitcoin_hash() == *block_hash)
+                .map(|h| h.clone())
         }
 
         fn get_header_for_height(&self, height: u32) -> Option<BlockHeader> {
-            self.trunk.lock().unwrap().get(height as usize).map(|h| h.clone())
+            self.trunk
+                .lock()
+                .unwrap()
+                .get(height as usize)
+                .map(|h| h.clone())
         }
 
         fn get_height(&self, block_hash: &sha256d::Hash) -> Option<u32> {
-            self.trunk.lock().unwrap().iter().enumerate().find_map(|(i, h)| if h.bitcoin_hash() == *block_hash { Some(i as u32) } else { None })
+            self.trunk
+                .lock()
+                .unwrap()
+                .iter()
+                .enumerate()
+                .find_map(|(i, h)| {
+                    if h.bitcoin_hash() == *block_hash {
+                        Some(i as u32)
+                    } else {
+                        None
+                    }
+                })
         }
 
         fn get_tip(&self) -> Option<BlockHeader> {
@@ -367,11 +580,18 @@ mod test {
         //     hex::decode("0e05ba48bb0fdc7285dc9498202aeee5e1777ac4f55072b30f15f6a8632ad0f3fde1c41d9e162dbe5d3153282eaebd081cf3b3312336fc56f5dd18a2df6ea48c1cdd11a1ed11281cd2e0f864f02e5bed5ab03326ed24e43b8a184acff9cb4e730db484e33f2b24295a97b2ca87871a69384eb64d4160ce8b3e8b4d90234040970e531d4333a8979dbe533c2b2668bf43b6607b2d24c5b42765ebfdd075fd173c").unwrap().as_slice(),
         //     ExtendedPubKey::from_str("tpubD6NzVbkrYhZ4XKz4vgwBmnnVmA7EgWhnXvimQ4krq94yUgcSSbroi4uC1xbZ3UGMxG9M2utmaPjdpMrWW2uKRY9Mj4DZWrrY8M4pry8shsK").unwrap(),
         //     1567260002);
-        let (mnemonic, address, mut wallet) = Wallet::new(Network::Testnet, PASSPHRASE, Option::None);
+        let (mnemonic, address, mut wallet) =
+            Wallet::new(Network::Testnet, PASSPHRASE, Option::None);
         let mut unlocker = Unlocker::new_for_master(&wallet.master, PASSPHRASE).unwrap();
-        wallet.master.add_account(Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 0, 10).unwrap());
-        wallet.master.add_account(Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 1, 10).unwrap());
-        wallet.master.add_account(Account::new(&mut unlocker, AccountAddressType::P2WSH(4711), 1, 0, 0).unwrap());
+        wallet.master.add_account(
+            Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 0, 10).unwrap(),
+        );
+        wallet.master.add_account(
+            Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 1, 10).unwrap(),
+        );
+        wallet.master.add_account(
+            Account::new(&mut unlocker, AccountAddressType::P2WSH(4711), 1, 0, 0).unwrap(),
+        );
         wallet
     }
 
@@ -379,7 +599,10 @@ mod test {
         Block {
             header: BlockHeader {
                 version: 1,
-                time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as u32,
+                time: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as u32,
                 nonce: 0,
                 bits: 0x1d00ffff,
                 prev_blockhash: prev.clone(),
@@ -393,16 +616,19 @@ mod test {
         Transaction {
             version: 2,
             lock_time: 0,
-            input: vec!(TxIn {
+            input: vec![TxIn {
                 sequence: 0xffffffff,
                 witness: Vec::new(),
-                previous_output: OutPoint { txid: sha256d::Hash::default(), vout: 0 },
+                previous_output: OutPoint {
+                    txid: sha256d::Hash::default(),
+                    vout: 0,
+                },
                 script_sig: Builder::new().push_int(height as i64).into_script(),
-            }),
-            output: vec!(TxOut {
+            }],
+            output: vec![TxOut {
                 value: NEW_COINS,
                 script_pubkey: miner.script_pubkey(),
-            }),
+            }],
         }
     }
 
@@ -417,14 +643,21 @@ mod test {
         block
     }
 
-
     #[test]
     pub fn process_blocks_balance() {
-        let trunk = Arc::new(
-            TestTrunk { trunk: Arc::new(Mutex::new(Vec::new())) });
+        let trunk = Arc::new(TestTrunk {
+            trunk: Arc::new(Mutex::new(Vec::new())),
+        });
         let mut wallet = new_wallet();
         let genesis = genesis_block(Network::Testnet);
-        let miner = wallet.master.get_mut((0, 0)).unwrap().next_key().unwrap().address.clone();
+        let miner = wallet
+            .master
+            .get_mut((0, 0))
+            .unwrap()
+            .next_key()
+            .unwrap()
+            .address
+            .clone();
 
         trunk.extend(&genesis.header);
         wallet.process(&genesis);
@@ -435,8 +668,19 @@ mod test {
 
         assert_eq!(wallet.balance(), NEW_COINS);
 
-        let burn = Address::p2shwsh(&Builder::new().push_opcode(all::OP_VERIFY).into_script(), Network::Testnet);
-        let (burn_half, _) = wallet.withdraw(PASSPHRASE.to_string(), burn, 1, Some(NEW_COINS / 2), trunk.clone()).unwrap();
+        let burn = Address::p2shwsh(
+            &Builder::new().push_opcode(all::OP_VERIFY).into_script(),
+            Network::Testnet,
+        );
+        let (burn_half, _) = wallet
+            .withdraw(
+                PASSPHRASE.to_string(),
+                burn,
+                1,
+                Some(NEW_COINS / 2),
+                trunk.clone(),
+            )
+            .unwrap();
 
         let mut next = mine(&next.bitcoin_hash(), 2, &miner);
         add_tx(&mut next, burn_half);
@@ -444,22 +688,35 @@ mod test {
         wallet.process(&next);
         assert_eq!(wallet.balance(), NEW_COINS + NEW_COINS / 2);
 
-        let (fund, _, fee) = wallet.fund(&sha256::Hash::default(), 1, PASSPHRASE.to_string(), 5, NEW_COINS / 10, trunk.clone(),
-                                         |pk: &PublicKey, term: Option<u16>| {
-                                             ContentStore::funding_script(pk, term.unwrap())
-                                         }).unwrap();
+        let (fund, _, fee) = wallet
+            .fund(
+                &sha256::Hash::default(),
+                1,
+                PASSPHRASE.to_string(),
+                5,
+                NEW_COINS / 10,
+                trunk.clone(),
+                |pk: &PublicKey, term: Option<u16>| ContentStore::funding_script(pk, term.unwrap()),
+            )
+            .unwrap();
 
         let mut next = mine(&next.bitcoin_hash(), 3, &miner);
         add_tx(&mut next, fund);
         trunk.extend(&next.header);
         wallet.process(&next);
         assert_eq!(wallet.balance(), 2 * NEW_COINS + NEW_COINS / 2 - fee);
-        assert_eq!(wallet.available_balance(3, |h| trunk.get_height(h)), 2 * NEW_COINS + NEW_COINS / 2 - NEW_COINS / 10);
+        assert_eq!(
+            wallet.available_balance(3, |h| trunk.get_height(h)),
+            2 * NEW_COINS + NEW_COINS / 2 - NEW_COINS / 10
+        );
 
         let next = mine(&next.bitcoin_hash(), 4, &miner);
         trunk.extend(&next.header);
         wallet.process(&next);
         assert_eq!(wallet.balance(), 3 * NEW_COINS + NEW_COINS / 2 - fee);
-        assert_eq!(wallet.available_balance(4, |h| trunk.get_height(h)), 3 * NEW_COINS + NEW_COINS / 2 - fee);
+        assert_eq!(
+            wallet.available_balance(4, |h| trunk.get_height(h)),
+            3 * NEW_COINS + NEW_COINS / 2 - fee
+        );
     }
 }

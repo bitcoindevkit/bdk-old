@@ -19,15 +19,12 @@
 
 use std::sync::{Arc, RwLock};
 
-use bitcoin::{Address, BitcoinHash, Block, BlockHeader, PublicKey, Script, Transaction};
+use bitcoin::network::message::NetworkMessage;
 use bitcoin::{
-    blockdata::{
-        opcodes::all,
-        script::Builder,
-    },
+    blockdata::{opcodes::all, script::Builder},
     network::constants::Network,
 };
-use bitcoin::network::message::NetworkMessage;
+use bitcoin::{Address, BitcoinHash, Block, BlockHeader, PublicKey, Script, Transaction};
 use bitcoin_hashes::{sha256, sha256d};
 use log::{debug, info};
 use murmel::p2p::{PeerMessage, PeerMessageSender};
@@ -45,18 +42,22 @@ pub struct ContentStore {
     db: SharedDB,
     wallet: Wallet,
     txout: Option<PeerMessageSender<NetworkMessage>>,
-    stopped: bool
+    stopped: bool,
 }
 
 impl ContentStore {
     /// new content store
-    pub fn new(db: SharedDB, trunk: Arc<dyn Trunk + Send + Sync>, wallet: Wallet) -> Result<ContentStore, Error> {
+    pub fn new(
+        db: SharedDB,
+        trunk: Arc<dyn Trunk + Send + Sync>,
+        wallet: Wallet,
+    ) -> Result<ContentStore, Error> {
         Ok(ContentStore {
             trunk,
             db,
             wallet,
             txout: None,
-            stopped: false
+            stopped: false,
         })
     }
 
@@ -64,7 +65,7 @@ impl ContentStore {
         self.stopped = stopped;
     }
 
-    pub fn get_stopped(& self) -> bool {
+    pub fn get_stopped(&self) -> bool {
         self.stopped
     }
 
@@ -73,26 +74,58 @@ impl ContentStore {
     }
 
     pub fn balance(&self) -> Vec<u64> {
-        vec!(self.wallet.balance(), self.wallet.available_balance(self.trunk.len(), |h| self.trunk.get_height(h)))
+        vec![
+            self.wallet.balance(),
+            self.wallet
+                .available_balance(self.trunk.len(), |h| self.trunk.get_height(h)),
+        ]
     }
 
     pub fn deposit_address(&mut self) -> Address {
-        self.wallet.master.get_mut((0, 0)).expect("can not find 0/0 account")
-            .next_key().expect("can not generate receiver address in 0/0").address.clone()
+        self.wallet
+            .master
+            .get_mut((0, 0))
+            .expect("can not find 0/0 account")
+            .next_key()
+            .expect("can not generate receiver address in 0/0")
+            .address
+            .clone()
     }
 
-    pub fn fund(&mut self, id: &sha256::Hash, term: u16, amount: u64, fee_per_vbyte: u64, passpharse: String) -> Result<(Transaction, PublicKey, u64), Error> {
-        let (transaction, funder, fee) = self.wallet.fund(id, term, passpharse, fee_per_vbyte, amount, self.trunk.clone(),
-                                                          |pk, term| Self::funding_script(pk, term.unwrap()))?;
+    pub fn fund(
+        &mut self,
+        id: &sha256::Hash,
+        term: u16,
+        amount: u64,
+        fee_per_vbyte: u64,
+        passpharse: String,
+    ) -> Result<(Transaction, PublicKey, u64), Error> {
+        let (transaction, funder, fee) = self.wallet.fund(
+            id,
+            term,
+            passpharse,
+            fee_per_vbyte,
+            amount,
+            self.trunk.clone(),
+            |pk, term| Self::funding_script(pk, term.unwrap()),
+        )?;
         let mut db = self.db.lock().unwrap();
         let mut tx = db.transaction();
         tx.store_account(&self.wallet.master.get((1, 0)).unwrap())?;
-        tx.store_txout(&transaction, Some((&funder, id, term))).expect("can not store outgoing transaction");
+        tx.store_txout(&transaction, Some((&funder, id, term)))
+            .expect("can not store outgoing transaction");
         tx.commit();
         if let Some(ref txout) = self.txout {
-            txout.send(PeerMessage::Outgoing(NetworkMessage::Tx(transaction.clone())));
+            txout.send(PeerMessage::Outgoing(NetworkMessage::Tx(
+                transaction.clone(),
+            )));
         }
-        info!("Wallet balance: {} satoshis {} available", self.wallet.balance(), self.wallet.available_balance(self.trunk.len(), |h| self.trunk.get_height(h)));
+        info!(
+            "Wallet balance: {} satoshis {} available",
+            self.wallet.balance(),
+            self.wallet
+                .available_balance(self.trunk.len(), |h| self.trunk.get_height(h))
+        );
         Ok((transaction, funder, fee))
     }
 
@@ -110,17 +143,37 @@ impl ContentStore {
         Address::p2wsh(&Self::funding_script(tweaked, term), Network::Bitcoin)
     }
 
-    pub fn withdraw(&mut self, passphrase: String, address: Address, fee_per_vbyte: u64, amount: Option<u64>) -> Result<(Transaction, u64), Error> {
-        let (transaction, fee) = self.wallet.withdraw(passphrase, address, fee_per_vbyte, amount, self.trunk.clone())?;
+    pub fn withdraw(
+        &mut self,
+        passphrase: String,
+        address: Address,
+        fee_per_vbyte: u64,
+        amount: Option<u64>,
+    ) -> Result<(Transaction, u64), Error> {
+        let (transaction, fee) = self.wallet.withdraw(
+            passphrase,
+            address,
+            fee_per_vbyte,
+            amount,
+            self.trunk.clone(),
+        )?;
         let mut db = self.db.lock().unwrap();
         let mut tx = db.transaction();
         tx.store_account(&self.wallet.master.get((0, 1)).unwrap())?;
-        tx.store_txout(&transaction, None).expect("can not store outgoing transaction");
+        tx.store_txout(&transaction, None)
+            .expect("can not store outgoing transaction");
         tx.commit();
         if let Some(ref txout) = self.txout {
-            txout.send(PeerMessage::Outgoing(NetworkMessage::Tx(transaction.clone())));
+            txout.send(PeerMessage::Outgoing(NetworkMessage::Tx(
+                transaction.clone(),
+            )));
         }
-        info!("Wallet balance: {} satoshis {} available", self.wallet.balance(), self.wallet.available_balance(self.trunk.len(), |h| self.trunk.get_height(h)));
+        info!(
+            "Wallet balance: {} satoshis {} available",
+            self.wallet.balance(),
+            self.wallet
+                .available_balance(self.trunk.len(), |h| self.trunk.get_height(h))
+        );
         Ok((transaction, fee))
     }
 
@@ -132,7 +185,11 @@ impl ContentStore {
     }
 
     pub fn block_connected(&mut self, block: &Block, height: u32) -> Result<(), Error> {
-        debug!("processing block {} {}", height, block.header.bitcoin_hash());
+        debug!(
+            "processing block {} {}",
+            height,
+            block.header.bitcoin_hash()
+        );
         // let newly_confirmed_publication;
         {
             let mut db = self.db.lock().unwrap();
@@ -140,7 +197,12 @@ impl ContentStore {
 
             if self.wallet.process(block) {
                 tx.store_coins(&self.wallet.coins())?;
-                info!("New wallet balance {} satoshis {} available", self.wallet.balance(), self.wallet.available_balance(self.trunk.len(), |h| self.trunk.get_height(h)));
+                info!(
+                    "New wallet balance {} satoshis {} available",
+                    self.wallet.balance(),
+                    self.wallet
+                        .available_balance(self.trunk.len(), |h| self.trunk.get_height(h))
+                );
             }
             tx.store_processed(&block.header.bitcoin_hash())?;
             tx.commit();
@@ -150,7 +212,11 @@ impl ContentStore {
 
     /// add a header to the tip of the chain
     pub fn add_header(&mut self, height: u32, header: &BlockHeader) -> Result<(), Error> {
-        info!("new chain tip at height {} {}", height, header.bitcoin_hash());
+        info!(
+            "new chain tip at height {} {}",
+            height,
+            header.bitcoin_hash()
+        );
         Ok(())
     }
 
@@ -169,16 +235,19 @@ impl ContentStore {
 
 #[cfg(test)]
 mod test {
+    use std::time::{SystemTime, UNIX_EPOCH};
     use std::{
         str::FromStr,
         sync::{Arc, Mutex},
     };
-    use std::time::{SystemTime, UNIX_EPOCH};
 
-    use bitcoin::{Address, BitcoinHash, Block, blockdata::opcodes::all, BlockHeader, network::constants::Network, OutPoint, Transaction, TxIn, TxOut, util::bip32::ExtendedPubKey};
     use bitcoin::blockdata::constants::genesis_block;
     use bitcoin::blockdata::script::Builder;
     use bitcoin::util::hash::MerkleRoot;
+    use bitcoin::{
+        blockdata::opcodes::all, network::constants::Network, util::bip32::ExtendedPubKey, Address,
+        BitcoinHash, Block, BlockHeader, OutPoint, Transaction, TxIn, TxOut,
+    };
     use bitcoin_hashes::sha256d;
     use bitcoin_wallet::account::{Account, AccountAddressType, Unlocker};
 
@@ -192,7 +261,7 @@ mod test {
     const PASSPHRASE: &str = "whatever";
 
     struct TestTrunk {
-        trunk: Arc<Mutex<Vec<BlockHeader>>>
+        trunk: Arc<Mutex<Vec<BlockHeader>>>,
     }
 
     impl TestTrunk {
@@ -203,19 +272,43 @@ mod test {
 
     impl Trunk for TestTrunk {
         fn is_on_trunk(&self, block_hash: &sha256d::Hash) -> bool {
-            self.trunk.lock().unwrap().iter().any(|h| h.bitcoin_hash() == *block_hash)
+            self.trunk
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|h| h.bitcoin_hash() == *block_hash)
         }
 
         fn get_header(&self, block_hash: &sha256d::Hash) -> Option<BlockHeader> {
-            self.trunk.lock().unwrap().iter().find(|h| h.bitcoin_hash() == *block_hash).map(|h| h.clone())
+            self.trunk
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|h| h.bitcoin_hash() == *block_hash)
+                .map(|h| h.clone())
         }
 
         fn get_header_for_height(&self, height: u32) -> Option<BlockHeader> {
-            self.trunk.lock().unwrap().get(height as usize).map(|h| h.clone())
+            self.trunk
+                .lock()
+                .unwrap()
+                .get(height as usize)
+                .map(|h| h.clone())
         }
 
         fn get_height(&self, block_hash: &sha256d::Hash) -> Option<u32> {
-            self.trunk.lock().unwrap().iter().enumerate().find_map(|(i, h)| if h.bitcoin_hash() == *block_hash { Some(i as u32) } else { None })
+            self.trunk
+                .lock()
+                .unwrap()
+                .iter()
+                .enumerate()
+                .find_map(|(i, h)| {
+                    if h.bitcoin_hash() == *block_hash {
+                        Some(i as u32)
+                    } else {
+                        None
+                    }
+                })
         }
 
         fn get_tip(&self) -> Option<BlockHeader> {
@@ -244,9 +337,15 @@ mod test {
             ExtendedPubKey::from_str("tpubD6NzVbkrYhZ4XKz4vgwBmnnVmA7EgWhnXvimQ4krq94yUgcSSbroi4uC1xbZ3UGMxG9M2utmaPjdpMrWW2uKRY9Mj4DZWrrY8M4pry8shsK").unwrap(),
             1567260002);
         let mut unlocker = Unlocker::new_for_master(&wallet.master, PASSPHRASE).unwrap();
-        wallet.master.add_account(Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 0, 10).unwrap());
-        wallet.master.add_account(Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 1, 10).unwrap());
-        wallet.master.add_account(Account::new(&mut unlocker, AccountAddressType::P2WSH(4711), 1, 0, 0).unwrap());
+        wallet.master.add_account(
+            Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 0, 10).unwrap(),
+        );
+        wallet.master.add_account(
+            Account::new(&mut unlocker, AccountAddressType::P2WPKH, 0, 1, 10).unwrap(),
+        );
+        wallet.master.add_account(
+            Account::new(&mut unlocker, AccountAddressType::P2WSH(4711), 1, 0, 0).unwrap(),
+        );
 
         ContentStore::new(Arc::new(Mutex::new(memdb)), trunk, wallet).unwrap()
     }
@@ -255,7 +354,10 @@ mod test {
         Block {
             header: BlockHeader {
                 version: 1,
-                time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as u32,
+                time: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as u32,
                 nonce: 0,
                 bits: 0x1d00ffff,
                 prev_blockhash: prev.clone(),
@@ -269,16 +371,19 @@ mod test {
         Transaction {
             version: 2,
             lock_time: 0,
-            input: vec!(TxIn {
+            input: vec![TxIn {
                 sequence: 0xffffffff,
                 witness: Vec::new(),
-                previous_output: OutPoint { txid: sha256d::Hash::default(), vout: 0 },
+                previous_output: OutPoint {
+                    txid: sha256d::Hash::default(),
+                    vout: 0,
+                },
                 script_sig: Builder::new().push_int(height as i64).into_script(),
-            }),
-            output: vec!(TxOut {
+            }],
+            output: vec![TxOut {
                 value: NEW_COINS,
                 script_pubkey: miner.script_pubkey(),
-            }),
+            }],
         }
     }
 

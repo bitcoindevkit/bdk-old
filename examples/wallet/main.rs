@@ -21,7 +21,7 @@ extern crate clap;
 use std::cmp::max;
 use std::convert::TryFrom;
 use std::net::{AddrParseError, SocketAddr};
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
@@ -30,15 +30,15 @@ use bitcoin_hashes::core::time::Duration;
 use clap::App;
 use futures::StreamExt;
 use log::{debug, error, info, warn, LevelFilter};
-use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
-use bdk::api::{balance, deposit_addr, init_config, start, stop, update_config, withdraw};
 use bdk::api;
+use bdk::api::{balance, deposit_addr, init_config, start, stop, update_config, withdraw};
 use bdk::config::Config;
 use bdk::error::Error;
-use std::process::ChildStderr;
 use chrono::Local;
+use std::process::ChildStderr;
 
 mod ui;
 
@@ -49,12 +49,18 @@ fn main() -> Result<(), Error> {
     let cli = ui::cli().get_matches();
     let log_level = cli.value_of("logging").unwrap_or("info");
 
-    let connections = cli.value_of("connections").map(|c| c.parse::<usize>().unwrap()).unwrap_or(5);
+    let connections = cli
+        .value_of("connections")
+        .map(|c| c.parse::<usize>().unwrap())
+        .unwrap_or(5);
     let directory = cli.value_of("directory").unwrap_or(".");
     let discovery = cli.value_of("discovery").map(|d| d == "on").unwrap_or(true);
     let network = cli.value_of("network").unwrap_or("testnet");
     let password = cli.value_of("password").expect("password is required");
-    let peers = cli.values_of("peers").map(|a| a.collect::<Vec<&str>>()).unwrap_or(Vec::new());
+    let peers = cli
+        .values_of("peers")
+        .map(|a| a.collect::<Vec<&str>>())
+        .unwrap_or(Vec::new());
 
     let work_dir: PathBuf = PathBuf::from(directory);
     let mut log_file = work_dir.clone();
@@ -83,7 +89,10 @@ fn main() -> Result<(), Error> {
 
     match init_result {
         Ok(Some(init_result)) => {
-            println!("created new wallet, seed words: {}", init_result.mnemonic_words);
+            println!(
+                "created new wallet, seed words: {}",
+                init_result.mnemonic_words
+            );
             println!("first deposit address: {}", init_result.deposit_address);
         }
         Ok(None) => {
@@ -94,7 +103,8 @@ fn main() -> Result<(), Error> {
         }
     };
 
-    let peers = peers.into_iter()
+    let peers = peers
+        .into_iter()
         .map(|p| SocketAddr::from_str(p))
         .collect::<Result<Vec<SocketAddr>, AddrParseError>>()?;
 
@@ -102,7 +112,8 @@ fn main() -> Result<(), Error> {
 
     println!("peer connections: {}", connections);
 
-    let config = api::update_config(work_dir.clone(), network, peers, connections, discovery).unwrap();
+    let config =
+        api::update_config(work_dir.clone(), network, peers, connections, discovery).unwrap();
     debug!("config: {:?}", config);
 
     let mut rl = Editor::<()>::new();
@@ -132,20 +143,29 @@ fn main() -> Result<(), Error> {
                             }
                             "balance" => {
                                 let balance_amt = api::balance().unwrap();
-                                println!("balance: {}, confirmed: {}", balance_amt.balance, balance_amt.confirmed);
+                                println!(
+                                    "balance: {}, confirmed: {}",
+                                    balance_amt.balance, balance_amt.confirmed
+                                );
                             }
                             "deposit" => {
-                               let deposit_addr = api::deposit_addr();
+                                let deposit_addr = api::deposit_addr();
                                 println!("deposit address: {}", deposit_addr);
                             }
                             "withdraw" => {
                                 // passphrase: String, address: Address, fee_per_vbyte: u64, amount: Option<u64>
                                 let password = a.value_of("password").unwrap().to_string();
-                                let address = Address::from_str(a.value_of("address").unwrap()).unwrap();
+                                let address =
+                                    Address::from_str(a.value_of("address").unwrap()).unwrap();
                                 let fee = a.value_of("fee").unwrap().parse::<u64>().unwrap();
-                                let amount = Some(a.value_of("amount").unwrap().parse::<u64>().unwrap());
-                                let withdraw_tx = api::withdraw(password, address, fee, amount).unwrap();
-                                println!("withdraw tx id: {}, fee: {}", withdraw_tx.txid, withdraw_tx.fee);
+                                let amount =
+                                    Some(a.value_of("amount").unwrap().parse::<u64>().unwrap());
+                                let withdraw_tx =
+                                    api::withdraw(password, address, fee, amount).unwrap();
+                                println!(
+                                    "withdraw tx id: {}, fee: {}",
+                                    withdraw_tx.txid, withdraw_tx.fee
+                                );
                             }
                             _ => {
                                 println!("command '{}' is not implemented", c);

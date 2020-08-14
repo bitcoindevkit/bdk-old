@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
+use crate::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::path::Path;
-use crate::error::Error;
 
 use bitcoin::Network;
 
@@ -37,7 +37,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(encryptedwalletkey: &str, keyroot: &str, lookahead: u32, birth: u64, network: Network) -> Config {
+    pub fn new(
+        encryptedwalletkey: &str,
+        keyroot: &str,
+        lookahead: u32,
+        birth: u64,
+        network: Network,
+    ) -> Config {
         Config {
             encryptedwalletkey: String::from(encryptedwalletkey),
             keyroot: String::from(keyroot),
@@ -50,7 +56,12 @@ impl Config {
         }
     }
 
-    pub fn update(&self, bitcoin_peers: Vec<SocketAddr>, bitcoin_connections: usize, bitcoin_discovery: bool) -> Config {
+    pub fn update(
+        &self,
+        bitcoin_peers: Vec<SocketAddr>,
+        bitcoin_connections: usize,
+        bitcoin_discovery: bool,
+    ) -> Config {
         Config {
             encryptedwalletkey: self.encryptedwalletkey.clone(),
             keyroot: self.keyroot.clone(),
@@ -81,23 +92,23 @@ pub fn load(file_path: &Path) -> Result<Config, Error> {
     file.read_to_string(&mut config_string)?;
     match toml::from_str(config_string.as_str()) {
         Ok(c) => Ok(c),
-        Err(e) => Err(e.into())
+        Err(e) => Err(e.into()),
     }
 }
 
 pub fn remove(config_path: &Path) -> Result<(), Error> {
-     match fs::remove_dir_all(config_path) {
-         Ok(()) => Ok(()),
-         Err(e) => Err(e.into())
-     }
+    match fs::remove_dir_all(config_path) {
+        Ok(()) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use std::{fs, io};
     use std::error::Error;
     use std::path::PathBuf;
     use std::str::FromStr;
+    use std::{fs, io};
 
     use bitcoin::Network;
 
@@ -106,10 +117,7 @@ mod test {
 
     #[test]
     fn save_load_delete() {
-        let test_config = Config::new(
-            "encryptedwalletkey",
-            "keyroot",
-            0, 0, Network::Testnet);
+        let test_config = Config::new("encryptedwalletkey", "keyroot", 0, 0, Network::Testnet);
 
         let workdir_path = PathBuf::from("./test1");
         let mut config_path = workdir_path.clone();
@@ -117,7 +125,10 @@ mod test {
         let mut file_path = config_path.clone();
         file_path.push("bdk.cfg");
 
-        assert_eq!(config::save(&config_path, &file_path, &test_config).is_ok(), true);
+        assert_eq!(
+            config::save(&config_path, &file_path, &test_config).is_ok(),
+            true
+        );
         let loaded = config::load(&file_path);
         assert_eq!(loaded.is_ok(), true);
         assert_eq!(loaded.unwrap(), test_config);
@@ -126,10 +137,7 @@ mod test {
 
     #[test]
     fn save_update_load_delete() {
-        let test_config = Config::new(
-            "encryptedwalletkey",
-            "keyroot",
-            0, 0, Network::Testnet);
+        let test_config = Config::new("encryptedwalletkey", "keyroot", 0, 0, Network::Testnet);
 
         let workdir_path = PathBuf::from("./test2");
         let mut config_path = workdir_path.clone();
@@ -137,14 +145,21 @@ mod test {
         let mut file_path = config_path.clone();
         file_path.push("bdk.cfg");
 
-        assert_eq!(config::save(&config_path, &file_path, &test_config).is_ok(), true);
+        assert_eq!(
+            config::save(&config_path, &file_path, &test_config).is_ok(),
+            true
+        );
 
         let loaded = config::load(&file_path);
         assert_eq!(loaded.is_ok(), true);
         let loaded = loaded.unwrap();
         assert_eq!(loaded, test_config);
 
-        let bitcoin_peers = vec! {"127.0.0.1:8080".parse().unwrap(), "127.0.0.1:8081".parse().unwrap(), "127.0.0.1:8082".parse().unwrap()};
+        let bitcoin_peers = vec![
+            "127.0.0.1:8080".parse().unwrap(),
+            "127.0.0.1:8081".parse().unwrap(),
+            "127.0.0.1:8082".parse().unwrap(),
+        ];
         let updated = loaded.update(bitcoin_peers, 10, false);
         let saved_updated = config::save(&config_path, &file_path, &updated);
         assert_eq!(saved_updated.is_ok(), true);
@@ -163,4 +178,3 @@ mod test {
         assert_eq!(loaded_updated.is_ok(), false);
     }
 }
-

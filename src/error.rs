@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
+use bitcoin::blockdata::script;
+use bitcoin_wallet;
+use rusqlite;
 use std::convert;
 use std::fmt;
 use std::io;
-use bitcoin_wallet;
-use bitcoin::blockdata::script;
-use rusqlite;
 
 /// An error class to offer a unified error interface upstream
 pub enum Error {
